@@ -1,0 +1,30 @@
+[workspace]
+members = [
+    "ux-output",
+    "lx",
+    "px",
+    "logx",
+    "dx",
+    "arcx",
+    "envx",
+    "netx",
+    "jsonx",
+    "procx",
+    "idx",
+    "diffx",
+    "memx",
+    "statx",
+    "hashx",
+    "termx",
+]
+resolver = "2"
+
+[workspace.lints.rust]
+unused_imports = "warn"
+dead_code = "warn"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

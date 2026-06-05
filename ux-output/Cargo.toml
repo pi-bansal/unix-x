@@ -1,0 +1,12 @@
+[package]
+name = "ux-output"
+version = "0.1.0"
+edition = "2021"
+description = "Shared output logic for unix-x tools"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

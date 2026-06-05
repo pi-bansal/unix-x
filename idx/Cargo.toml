@@ -1,0 +1,48 @@
+[package]
+name = "idx"
+version = "0.1.0"
+edition = "2021"
+description = "Persistent columnar filesystem index with bloom filter — makes lx instant"
+
+[[bin]]
+name = "idx"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+ux-output = { path = "../ux-output" }
+
+# Columnar index serialization — fast binary format
+bincode = "1"
+
+# Bloom filter
+bloomfilter = "1"
+
+# File watching
+notify = "6"
+
+# Async runtime for the daemon
+tokio = { version = "1", features = ["full"] }
+
+# Unix socket IPC
+# (tokio handles this via tokio::net::UnixListener)
+
+# Git status
+git2 = { version = "0.19", default-features = false }
+
+# Memory-mapped file access for the index
+memmap2 = "0.9"
+
+# Fast hashing for the bloom filter and string interning
+ahash = "0.8"
+
+# Ignore .gitignore rules (same as lx/rg)
+ignore = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

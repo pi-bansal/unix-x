@@ -1,0 +1,14 @@
+# Integration tests live here — they run the compiled binaries as black-box tests.
+# Run with: cargo test --test lx_test (etc.) from the workspace root.
+#
+# Or run all integration tests:
+#   cargo build --workspace && cargo test --workspace
+
+[package]
+name = "unix-x-tests"
+version = "0.1.0"
+edition = "2021"
+
+[dev-dependencies]
+serde_json = "1"
+tempfile = "3"
