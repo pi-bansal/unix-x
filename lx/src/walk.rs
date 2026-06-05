@@ -41,11 +41,9 @@ pub fn walk(root: &Path, opts: &WalkOptions, git: Option<&GitIndex>) -> Vec<Entr
             Err(err) => {
                 // Emit structured error and continue
                 eprintln!(
-                    "{{\"error\": \"{}\", \"path\": \"{}\"}}",
-                    err,
-                    err.path()
-                        .map(|p| p.to_string_lossy().to_string())
-                        .unwrap_or_default()
+                    "{{\"error\": {}}}",
+                    serde_json::to_string(&err.to_string())
+                        .unwrap_or_else(|_| "\"walk error\"".to_string())
                 );
                 continue;
             }

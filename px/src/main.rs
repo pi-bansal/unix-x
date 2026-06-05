@@ -179,9 +179,6 @@ fn main() {
     };
 
     let count = processes.as_ref().map(|p| p.len()).unwrap_or(0)
-        + connections.as_ref().map(|c| c.len()).unwrap_or(0);
-
-    let count = processes.as_ref().map(|p| p.len()).unwrap_or(0)
         + if let NetworkResult::Available(ref c) = connections { c.len() } else { 0 };
 
     let output = Output {
@@ -198,7 +195,7 @@ fn main() {
                 println!("{}", serde_json::to_string(p).unwrap());
             }
         }
-        if let Some(ref conns) = output.connections {
+        if let NetworkResult::Available(ref conns) = output.connections {
             for c in conns {
                 println!("{}", serde_json::to_string(c).unwrap());
             }

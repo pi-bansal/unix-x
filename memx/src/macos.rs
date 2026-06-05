@@ -13,7 +13,7 @@
 use serde::Serialize;
 use std::process::Command;
 
-#[derive(Serialize, Clone, PartialEq)]
+#[derive(Serialize, Clone, PartialEq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum RegionKind {
     Heap,

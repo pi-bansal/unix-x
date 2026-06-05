@@ -1,5 +1,5 @@
 use serde::Serialize;
-use sysinfo::{Pid, Process, ProcessStatus, System};
+use sysinfo::{Process, ProcessStatus, System, Users};
 
 #[derive(Serialize)]
 pub struct ProcessEntry {
@@ -21,10 +21,11 @@ pub struct ProcessEntry {
 }
 
 pub fn collect_processes(sys: &System, include_env: bool) -> Vec<ProcessEntry> {
+    let users = Users::new_with_refreshed_list();
     let mut entries: Vec<ProcessEntry> = sys
         .processes()
         .values()
-        .map(|p| process_entry(p, sys, include_env))
+        .map(|p| process_entry(p, &users, include_env))
         .collect();
 
     // Sort by CPU desc, then memory desc
@@ -38,7 +39,7 @@ pub fn collect_processes(sys: &System, include_env: bool) -> Vec<ProcessEntry> {
     entries
 }
 
-fn process_entry(p: &Process, sys: &System, include_env: bool) -> ProcessEntry {
+fn process_entry(p: &Process, users: &Users, include_env: bool) -> ProcessEntry {
     let ppid = p.parent().map(|pid| pid.as_u32());
 
     let status = match p.status() {
@@ -53,7 +54,7 @@ fn process_entry(p: &Process, sys: &System, include_env: bool) -> ProcessEntry {
     .to_string();
 
     let user = p.user_id().and_then(|uid| {
-        sys.get_user_by_id(uid)
+        users.get_user_by_id(uid)
             .map(|u| u.name().to_string())
     });
 

@@ -55,7 +55,7 @@ pub struct TermInfo {
     pub interactive:    bool,             // is_tty && !ci
 }
 
-#[derive(Serialize, PartialEq)]
+#[derive(Serialize, PartialEq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum ColorDepth {
     None,         // no color support
@@ -64,7 +64,7 @@ pub enum ColorDepth {
     TrueColor,    // 24-bit
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Multiplexer {
     Tmux,

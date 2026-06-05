@@ -20,7 +20,7 @@
 use serde::Serialize;
 use std::fs;
 
-#[derive(Serialize, Clone, PartialEq)]
+#[derive(Serialize, Clone, PartialEq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum RegionKind {
     Heap,

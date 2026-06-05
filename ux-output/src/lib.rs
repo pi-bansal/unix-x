@@ -37,7 +37,7 @@ impl OutMode {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum ResolvedMode {
     Compact,
     Pretty,

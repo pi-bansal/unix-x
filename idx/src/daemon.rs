@@ -25,7 +25,7 @@ use tokio::sync::mpsc;
 
 // ── IPC message types ─────────────────────────────────────────────────────────
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Request {
     Query(Query),
@@ -33,7 +33,7 @@ pub enum Request {
     Rebuild,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Response {
     QueryResult(QueryResult),
@@ -42,7 +42,7 @@ pub enum Response {
     Error { message: String },
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct DaemonStatus {
     pub root: String,
     pub indexed_files: usize,

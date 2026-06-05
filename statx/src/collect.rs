@@ -35,8 +35,8 @@ impl Collector {
 
     pub fn sample(&mut self) -> Sample {
         self.sys.refresh_all();
-        self.disks.refresh();
-        self.networks.refresh();
+        self.disks.refresh(true);
+        self.networks.refresh(true);
 
         let ts = now_secs();
         let elapsed = (ts - self.prev_ts).max(1) as f64;
