@@ -70,7 +70,7 @@ fn parse_plist(
     domain: &str,
     running: &std::collections::HashMap<String, (Option<u32>, Option<i32>)>,
 ) -> Option<LaunchdJob> {
-    let val = plist::from_file::<Value, _>(path).ok()?;
+    let val = Value::from_file(path).ok()?;
     let dict = val.as_dictionary()?;
 
     let label = dict.get("Label")?.as_string()?.to_string();

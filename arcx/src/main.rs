@@ -153,12 +153,13 @@ fn inspect_zip(path: &Path) -> Result<ArchiveInfo, String> {
         }
         .to_string();
 
-        let modified = entry.last_modified().map(|dt| {
+        let dt = entry.last_modified();
+        let modified = {
             // Approximate: seconds since 1970 from zip datetime
             let year = dt.year() as u64;
             let days = (year - 1970) * 365 + dt.month() as u64 * 30 + dt.day() as u64;
-            days * 86400 + dt.hour() as u64 * 3600 + dt.minute() as u64 * 60 + dt.second() as u64
-        });
+            Some(days * 86400 + dt.hour() as u64 * 3600 + dt.minute() as u64 * 60 + dt.second() as u64)
+        };
 
         let permissions = entry.unix_mode().map(|m| format!("{:03o}", m & 0o777));
 

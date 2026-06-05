@@ -10,8 +10,18 @@ pub enum Step {
     Slice(Option<usize>, Option<usize>), // [1:3]
 }
 
+/// Turn a bare dot-segment into a step. A `*` segment is a wildcard (`.*`),
+/// everything else is a key.
+fn make_step(segment: &str) -> Step {
+    if segment == "*" {
+        Step::Wildcard
+    } else {
+        Step::Key(segment.to_string())
+    }
+}
+
 /// Parse a dot-path expression into steps.
-/// Supports: .key, .key.nested, .[0], .[], .key[0].other
+/// Supports: .key, .key.nested, .[0], .[], .*, .key[0].other
 pub fn parse_path(expr: &str) -> Vec<Step> {
     let mut steps = Vec::new();
     let expr = expr.trim_start_matches('.');
@@ -23,13 +33,13 @@ pub fn parse_path(expr: &str) -> Vec<Step> {
         match c {
             '.' => {
                 if !current.is_empty() {
-                    steps.push(Step::Key(current.clone()));
+                    steps.push(make_step(&current));
                     current.clear();
                 }
             }
             '[' => {
                 if !current.is_empty() {
-                    steps.push(Step::Key(current.clone()));
+                    steps.push(make_step(&current));
                     current.clear();
                 }
                 let mut bracket = String::new();
@@ -47,7 +57,7 @@ pub fn parse_path(expr: &str) -> Vec<Step> {
     }
 
     if !current.is_empty() {
-        steps.push(Step::Key(current));
+        steps.push(make_step(&current));
     }
 
     steps

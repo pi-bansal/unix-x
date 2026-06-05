@@ -28,7 +28,7 @@
 use serde::Serialize;
 use similar::{ChangeTag, TextDiff};
 
-#[derive(Serialize, Clone, PartialEq)]
+#[derive(Serialize, Clone, PartialEq, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum HunkKind {
     Unchanged,
@@ -85,10 +85,10 @@ pub fn three_way_merge(base: &str, ours: &str, theirs: &str) -> MergeResult {
     let mut i = 0;
 
     while i < n {
-        let our_op   = ours_changes.get(i).copied().unwrap_or(Op::Keep);
-        let their_op = theirs_changes.get(i).copied().unwrap_or(Op::Keep);
+        let our_op   = ours_changes.get(i).cloned().unwrap_or(Op::Keep);
+        let their_op = theirs_changes.get(i).cloned().unwrap_or(Op::Keep);
 
-        match (our_op, their_op) {
+        match (&our_op, &their_op) {
             // Both unchanged
             (Op::Keep, Op::Keep) => {
                 let line = base_lines.get(i).copied().unwrap_or("").to_string();
@@ -117,7 +117,7 @@ pub fn three_way_merge(base: &str, ours: &str, theirs: &str) -> MergeResult {
             }
 
             // Only ours changed
-            (Op::Replace(ref o), Op::Keep) | (Op::Delete, Op::Keep) => {
+            (Op::Replace(_), Op::Keep) | (Op::Delete, Op::Keep) => {
                 let base_line  = base_lines.get(i).copied().unwrap_or("").to_string();
                 let our_lines  = match &our_op {
                     Op::Replace(v) => v.clone(),
@@ -139,7 +139,7 @@ pub fn three_way_merge(base: &str, ours: &str, theirs: &str) -> MergeResult {
             }
 
             // Only theirs changed
-            (Op::Keep, Op::Replace(ref t)) | (Op::Keep, Op::Delete) => {
+            (Op::Keep, Op::Replace(_)) | (Op::Keep, Op::Delete) => {
                 let base_line    = base_lines.get(i).copied().unwrap_or("").to_string();
                 let their_lines  = match &their_op {
                     Op::Replace(v) => v.clone(),
@@ -234,33 +234,73 @@ enum Op {
 }
 
 /// Compute a line-level diff and return a per-base-line operation map.
+///
+/// `similar` emits changes in runs — for a modified line it yields a `Delete`
+/// of the base line followed by `Insert`s of the new content. We accumulate
+/// each run and resolve it against the base line indices it touches:
+///   - delete(s) + insert(s) → `Replace` on the first deleted line
+///     (extra deleted lines become `Delete`)
+///   - delete(s) only        → `Delete`
+///   - insert(s) only        → fold the inserted text into a neighbouring base
+///     line so it survives in the merged output
 fn line_diff(base: &str, other: &str) -> Vec<(usize, Op)> {
     let diff = TextDiff::from_lines(base, other);
+    let base_lines: Vec<&str> = base.lines().collect();
     let mut ops: Vec<(usize, Op)> = Vec::new();
 
     let mut base_idx = 0usize;
-    let mut pending_insert: Vec<String> = Vec::new();
+    let mut del_indices: Vec<usize> = Vec::new();
+    let mut inserts: Vec<String> = Vec::new();
+
+    // Resolve the current run of deletes/inserts into per-base-line ops.
+    let flush = |del_indices: &mut Vec<usize>,
+                 inserts: &mut Vec<String>,
+                 base_idx: usize,
+                 ops: &mut Vec<(usize, Op)>| {
+        if del_indices.is_empty() && inserts.is_empty() {
+            return;
+        }
+        if !del_indices.is_empty() {
+            // Fold all inserted lines into the first deleted slot (Replace);
+            // any remaining deleted slots become plain deletes.
+            for (k, &di) in del_indices.iter().enumerate() {
+                if k == 0 && !inserts.is_empty() {
+                    ops.push((di, Op::Replace(std::mem::take(inserts))));
+                } else {
+                    ops.push((di, Op::Delete));
+                }
+            }
+        } else if base_idx < base_lines.len() {
+            // Pure insertion before the upcoming line: prepend to it.
+            let mut v = std::mem::take(inserts);
+            v.push(base_lines[base_idx].to_string());
+            ops.push((base_idx, Op::Replace(v)));
+        } else if base_idx > 0 {
+            // Trailing insertion: append to the previous line.
+            let mut v = vec![base_lines[base_idx - 1].to_string()];
+            v.append(&mut std::mem::take(inserts));
+            ops.push((base_idx - 1, Op::Replace(v)));
+        }
+        del_indices.clear();
+        inserts.clear();
+    };
 
     for change in diff.iter_all_changes() {
         match change.tag() {
             ChangeTag::Equal => {
-                if !pending_insert.is_empty() {
-                    ops.push((base_idx, Op::Replace(pending_insert.drain(..).collect())));
-                }
+                flush(&mut del_indices, &mut inserts, base_idx, &mut ops);
                 base_idx += 1;
             }
             ChangeTag::Delete => {
-                if !pending_insert.is_empty() {
-                    ops.push((base_idx, Op::Replace(pending_insert.drain(..).collect())));
-                }
-                ops.push((base_idx, Op::Delete));
+                del_indices.push(base_idx);
                 base_idx += 1;
             }
             ChangeTag::Insert => {
-                pending_insert.push(change.value().trim_end_matches('\n').to_string());
+                inserts.push(change.value().trim_end_matches('\n').to_string());
             }
         }
     }
+    flush(&mut del_indices, &mut inserts, base_idx, &mut ops);
 
     ops
 }

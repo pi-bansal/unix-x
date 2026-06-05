@@ -17,7 +17,7 @@ impl GitIndex {
 
         let mut statuses = HashMap::new();
 
-        let opts = {
+        let mut opts = {
             let mut o = git2::StatusOptions::new();
             o.include_untracked(true)
                 .recurse_untracked_dirs(true)
@@ -25,12 +25,12 @@ impl GitIndex {
             o
         };
 
-        if let Ok(status_list) = repo.statuses(Some(&mut opts.clone())) {
+        if let Ok(status_list) = repo.statuses(Some(&mut opts)) {
             for entry in status_list.iter() {
                 if let Some(path_str) = entry.path() {
                     let full_path = repo_root.join(path_str);
                     let status = map_status(entry.status());
-                    statuses.insert(full_path, status);
+                    statuses.insert(full_path.clone(), status);
 
                     // Also mark parent dirs as modified if any child is dirty
                     let mut parent = full_path.parent();

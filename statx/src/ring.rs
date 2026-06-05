@@ -9,7 +9,7 @@
 /// Agents query "last 60 seconds of CPU" → last 60 samples at 1s interval.
 /// The ring buffer makes this a simple slice read, no sorting, no filtering.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub struct RingBuffer<T> {
     buf:   Vec<T>,
@@ -56,7 +56,7 @@ impl<T: Clone + Default> RingBuffer<T> {
 }
 
 /// A single point-in-time system snapshot
-#[derive(Clone, Default, Serialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Sample {
     pub ts:              u64,    // unix epoch seconds
 

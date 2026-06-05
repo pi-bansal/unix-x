@@ -85,12 +85,15 @@ impl BloomSet {
             })
             .collect();
 
+        // Each individual component (so a bare-directory prefix like "src"
+        // matches) ...
+        for component in &components {
+            self.prefix.set(component);
+        }
+        // ... plus joined pairs for two-component subtree prefixes.
         for window in components.windows(2) {
             let prefix = format!("{}/{}", window[0], window[1]);
             self.prefix.set(prefix.as_str());
-        }
-        if let Some(first) = components.first() {
-            self.prefix.set(first);
         }
     }
 
@@ -121,17 +124,17 @@ pub fn serialize_bloom(bloom: &BloomSet) -> Vec<u8> {
     // filename
     let fb = bloom.filename.bitmap();
     out.extend_from_slice(&(fb.len() as u64).to_le_bytes());
-    out.extend_from_slice(fb);
+    out.extend_from_slice(&fb);
 
     // ext
     let eb = bloom.ext.bitmap();
     out.extend_from_slice(&(eb.len() as u64).to_le_bytes());
-    out.extend_from_slice(eb);
+    out.extend_from_slice(&eb);
 
     // prefix
     let pb = bloom.prefix.bitmap();
     out.extend_from_slice(&(pb.len() as u64).to_le_bytes());
-    out.extend_from_slice(pb);
+    out.extend_from_slice(&pb);
 
     out
 }

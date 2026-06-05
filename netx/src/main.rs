@@ -82,7 +82,7 @@ fn main() {
 
     let agent = ureq::AgentBuilder::new()
         .timeout(std::time::Duration::from_secs(cli.timeout))
-        .redirects(cli.follow as usize)
+        .redirects(cli.follow)
         .build();
 
     let method = cli.method.to_uppercase();
@@ -182,29 +182,22 @@ fn process_response(resp: ureq::Response, cli: &Cli, elapsed_ms: u128, method: &
 
 fn parse_body(resp: ureq::Response, content_type: &str) -> ResponseBody {
     let ct = content_type.to_lowercase();
+    let mut buf = Vec::new();
+    let mut reader = resp.into_reader();
+    reader.read_to_end(&mut buf).ok();
+    let body_str = String::from_utf8_lossy(&buf);
 
     if ct.contains("application/json") || ct.contains("+json") {
-        match resp.into_json::<Value>() {
-            Ok(v) => return ResponseBody::Json(v),
-            Err(_) => {}
+        if let Ok(v) = serde_json::from_str::<Value>(&body_str) {
+            return ResponseBody::Json(v);
         }
     }
 
     if ct.contains("text/") || ct.contains("application/xml") || ct.contains("application/javascript") {
-        match resp.into_string() {
-            Ok(s) => return ResponseBody::Text(s),
-            Err(_) => {}
-        }
+        return ResponseBody::Text(body_str.to_string());
     }
 
     // Binary fallback
-    let mut buf = Vec::new();
-    if let Ok(mut reader) = resp.into_reader().read_to_end(&mut buf).map(|_| ()) {
-        // unreachable pattern, just use buf
-    } else {
-        let _ = resp.into_reader();
-    }
-
     use base64::{Engine as _, engine::general_purpose};
     ResponseBody::Binary {
         encoding: "base64".to_string(),
@@ -229,8 +222,4 @@ fn emit(output: &Response, mode: &str) {
         }
         _ => println!("{}", serde_json::to_string(output).unwrap()),
     }
-}
-
-trait ReadToEnd {
-    fn read_to_end(&mut self, buf: &mut Vec<u8>) -> std::io::Result<usize>;
 }

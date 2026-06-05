@@ -51,7 +51,7 @@ pub struct Query {
     pub sort: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct QueryResult {
     pub count: usize,
     pub bloom_skipped: bool,   // true if bloom filter short-circuited the query
