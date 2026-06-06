@@ -1,4 +1,4 @@
-# unix-x
+# xunix
 
 Agent-optimized replacements for classic Unix tools. Fast, structured, JSON-first.
 
@@ -6,10 +6,10 @@ Built for AI agents that call shell tools. Humans can use them too — `--out ta
 
 ```bash
 # macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/unix-x/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/xunix/main/install.sh | bash
 
 # Windows (PowerShell)
-iwr https://raw.githubusercontent.com/YOUR_USERNAME/unix-x/main/install.ps1 | iex
+iwr https://raw.githubusercontent.com/YOUR_USERNAME/xunix/main/install.ps1 | iex
 ```
 
 ---
@@ -18,7 +18,7 @@ iwr https://raw.githubusercontent.com/YOUR_USERNAME/unix-x/main/install.ps1 | ie
 
 Unix tools were designed for humans. Output is formatted text meant to be read in a terminal. When an AI agent calls `ps aux` it gets a column-aligned table it has to parse back into structured data — slow, brittle, and wasteful.
 
-`unix-x` tools output JSON by default. Timestamps are integers. Errors are structured. No parsing required.
+`xunix` tools output JSON by default. Timestamps are integers. Errors are structured. No parsing required.
 
 Inspired by how `ripgrep` reimagined `grep` — not a wrapper, a ground-up rethink with the right defaults.
 
@@ -63,8 +63,8 @@ Every tool follows the same rules:
 ## Build
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/unix-x
-cd unix-x
+git clone https://github.com/YOUR_USERNAME/xunix
+cd xunix
 cargo build --workspace --release
 
 # All binaries land in target/release/

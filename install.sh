@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# unix-x installer — Linux and macOS
+# xunix installer — Linux and macOS
 # Windows: use install.ps1 instead
 set -euo pipefail
 
-REPO="YOUR_USERNAME/unix-x"
-INSTALL_DIR="${UNIX_X_INSTALL_DIR:-/usr/local/bin}"
+REPO="YOUR_USERNAME/xunix"
+INSTALL_DIR="${XUNIX_INSTALL_DIR:-/usr/local/bin}"
 TOOLS=(lx px logx dx arcx envx netx jsonx procx idx diffx memx statx hashx termx)
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -22,7 +22,7 @@ case "$OS" in
   *) echo "Unsupported OS: $OS — on Windows, run install.ps1" && exit 1 ;;
 esac
 
-echo "unix-x installer"
+echo "xunix installer"
 echo "Platform : $PLATFORM"
 echo "Install  : $INSTALL_DIR"
 echo ""
@@ -32,7 +32,7 @@ if [ "${BUILD_FROM_SOURCE:-0}" != "1" ]; then
     | grep '"tag_name"' | sed 's/.*"tag_name": "\(.*\)".*/\1/')
 
   if [ -n "$LATEST" ]; then
-    URL="https://github.com/${REPO}/releases/download/${LATEST}/unix-x-${PLATFORM}.tar.gz"
+    URL="https://github.com/${REPO}/releases/download/${LATEST}/xunix-${PLATFORM}.tar.gz"
     TMP=$(mktemp -d)
     trap 'rm -rf "$TMP"' EXIT
 
@@ -57,8 +57,8 @@ command -v cargo &>/dev/null || { echo "Rust not found. Install from https://rus
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
-git clone --depth=1 "https://github.com/${REPO}.git" "$TMP/unix-x"
-cd "$TMP/unix-x"
+git clone --depth=1 "https://github.com/${REPO}.git" "$TMP/xunix"
+cd "$TMP/xunix"
 cargo build --workspace --release
 
 for tool in "${TOOLS[@]}"; do

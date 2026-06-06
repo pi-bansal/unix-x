@@ -1,4 +1,4 @@
-// ux-output: shared output + platform fallback logic for unix-x tools
+// ux-output: shared output + platform fallback logic for xunix tools
 
 use serde::Serialize;
 

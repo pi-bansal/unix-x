@@ -1,14 +1,14 @@
-# unix-x installer for Windows (PowerShell)
-# Run: iwr https://raw.githubusercontent.com/YOUR_USERNAME/unix-x/main/install.ps1 | iex
+# xunix installer for Windows (PowerShell)
+# Run: iwr https://raw.githubusercontent.com/YOUR_USERNAME/xunix/main/install.ps1 | iex
 
-$Repo    = "YOUR_USERNAME/unix-x"
-$InstallDir = if ($env:UNIX_X_INSTALL_DIR) { $env:UNIX_X_INSTALL_DIR } else { "$env:USERPROFILE\.unix-x\bin" }
+$Repo    = "YOUR_USERNAME/xunix"
+$InstallDir = if ($env:XUNIX_INSTALL_DIR) { $env:XUNIX_INSTALL_DIR } else { "$env:USERPROFILE\.xunix\bin" }
 $Tools   = @("lx","px","logx","dx","arcx","envx","netx","jsonx","procx","idx","diffx","memx","statx","hashx","termx")
 $Arch    = if ([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq "Arm64") { "aarch64" } else { "x86_64" }
 $Platform = "windows-$Arch"
-$Artifact = "unix-x-$Platform.zip"
+$Artifact = "xunix-$Platform.zip"
 
-Write-Host "unix-x installer"
+Write-Host "xunix installer"
 Write-Host "Platform : $Platform"
 Write-Host "Install  : $InstallDir"
 Write-Host ""
@@ -22,7 +22,7 @@ if (-not $Release) {
 }
 
 $Url = "https://github.com/$Repo/releases/download/$Release/$Artifact"
-$Tmp = Join-Path $env:TEMP "unix-x-install"
+$Tmp = Join-Path $env:TEMP "xunix-install"
 New-Item -ItemType Directory -Force -Path $Tmp | Out-Null
 $ZipPath = Join-Path $Tmp $Artifact
 
