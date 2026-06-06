@@ -17,6 +17,7 @@ tar = "0.4"
 flate2 = "1"
 bzip2 = "0.4"
 xz2 = "0.1"
+ux-output = { path = "../ux-output" }
 
 [profile.release]
 opt-level = 3

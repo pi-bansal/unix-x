@@ -15,6 +15,7 @@ clap = { version = "4", features = ["derive"] }
 similar = { version = "2", features = ["inline"] }
 ignore = "0.4"
 walkdir = "2"
+ux-output = { path = "../ux-output" }
 
 [profile.release]
 opt-level = 3

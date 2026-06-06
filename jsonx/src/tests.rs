@@ -177,6 +177,60 @@ mod tests {
     }
 
     #[test]
+    fn filter_not_equal() {
+        let v = json!([
+            {"role": "admin"},
+            {"role": "user"},
+            {"role": "admin"}
+        ]);
+        let results = q(&v, r#".[?(@.role != "admin")]"#);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn filter_gte_lte() {
+        let v = json!([{"n": 5}, {"n": 10}, {"n": 15}]);
+        assert_eq!(q(&v, ".[?(@.n >= 10)]").len(), 2);
+        assert_eq!(q(&v, ".[?(@.n <= 10)]").len(), 2);
+    }
+
+    #[test]
+    fn filter_compound_and() {
+        let v = json!([
+            {"git_status": "modified", "size": 6000},
+            {"git_status": "modified", "size": 100},
+            {"git_status": "clean",    "size": 9000}
+        ]);
+        // The exact shape advertised in the README.
+        let results = q(&v, r#".[?(@.git_status == "modified" && @.size > 5000)]"#);
+        assert_eq!(results.len(), 1);
+        assert_eq!(q_first(&v, r#".[?(@.git_status == "modified" && @.size > 5000)].size"#), Some(&json!(6000)));
+    }
+
+    #[test]
+    fn filter_compound_or() {
+        let v = json!([
+            {"level": "error"},
+            {"level": "warn"},
+            {"level": "info"}
+        ]);
+        let results = q(&v, r#".[?(@.level == "error" || @.level == "warn")]"#);
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn filter_or_binds_looser_than_and() {
+        let v = json!([
+            {"a": 1, "b": 1},  // a==1 && b==2 -> false ; c... no -> matches second OR? a==1&&b==2 false, x==9 false => excluded
+            {"a": 1, "b": 2},  // first group true
+            {"x": 9}           // second group true
+        ]);
+        // (a==1 && b==2) || (x==9)
+        let results = q(&v, ".[?(@.a == 1 && @.b == 2 || @.x == 9)]");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
     fn filter_then_field_access() {
         let v = json!([
             {"active": "true", "name": "alice"},

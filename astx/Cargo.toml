@@ -1,19 +1,25 @@
 [package]
-name = "jsonx"
+name = "astx"
 version = "0.1.0"
 edition = "2021"
-description = "Fast JSON transform and query for AI agents"
+description = "Structured source-code AST inspection for AI agents"
 
 [[bin]]
-name = "jsonx"
+name = "astx"
 path = "src/main.rs"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 clap = { version = "4", features = ["derive"] }
-regex = "1"
 ux-output = { path = "../ux-output" }
+tree-sitter = "0.25"
+tree-sitter-rust = "0.24"
+tree-sitter-python = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-go = "0.23"
+streaming-iterator = "0.1"
 
 [profile.release]
 opt-level = 3

@@ -43,8 +43,8 @@ struct Cli {
     #[arg(short, long)]
     raw: bool,
 
-    /// Output: json (default), pretty, table, ndjson
-    #[arg(short, long, default_value = "json")]
+    /// Output mode: auto (default), json, pretty, table, ndjson
+    #[arg(short, long, default_value = "auto")]
     out: String,
 
     /// Read input as newline-delimited JSON (one object per line)
@@ -87,7 +87,7 @@ fn main() {
     };
 
     // Query all roots
-    let mut results: Vec<&Value> = roots.iter().flat_map(|r| jq(r, &steps)).collect();
+    let results: Vec<&Value> = roots.iter().flat_map(|r| jq(r, &steps)).collect();
 
     if cli.count {
         println!("{}", results.len());
@@ -149,6 +149,13 @@ fn emit_value(v: &Value, mode: &str, raw: bool) {
             _ => {}
         }
     }
+
+    // Resolve `auto`: pretty on a terminal, compact when piped.
+    let mode = if mode == "auto" {
+        if ux_output::is_tty() { "pretty" } else { "json" }
+    } else {
+        mode
+    };
 
     match mode {
         "pretty" => println!("{}", serde_json::to_string_pretty(v).unwrap()),

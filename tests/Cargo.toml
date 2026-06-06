@@ -1,14 +1,75 @@
-# Integration tests live here — they run the compiled binaries as black-box tests.
-# Run with: cargo test --test lx_test (etc.) from the workspace root.
+# Integration tests — black-box tests that run the compiled binaries.
 #
-# Or run all integration tests:
+# These are declared as explicit [[test]] targets because the test files live
+# at the package root (alongside this manifest) rather than in a tests/ subdir.
+#
+# Run all integration tests (binaries must be built first):
 #   cargo build --workspace && cargo test --workspace
 
 [package]
 name = "xunix-tests"
 version = "0.1.0"
 edition = "2021"
+autotests = false
+
+# Empty stub library: gives the package a primary target. The real work is in
+# the [[test]] integration binaries below, which shell out to the built tools.
+[lib]
+name = "xunix_tests"
+path = "lib.rs"
 
 [dev-dependencies]
 serde_json = "1"
 tempfile = "3"
+
+[[test]]
+name = "lx_test"
+path = "lx_test.rs"
+
+[[test]]
+name = "hashx_test"
+path = "hashx_test.rs"
+
+[[test]]
+name = "diffx_test"
+path = "diffx_test.rs"
+
+[[test]]
+name = "px_test"
+path = "px_test.rs"
+
+[[test]]
+name = "dx_test"
+path = "dx_test.rs"
+
+[[test]]
+name = "arcx_test"
+path = "arcx_test.rs"
+
+[[test]]
+name = "envx_test"
+path = "envx_test.rs"
+
+[[test]]
+name = "netx_test"
+path = "netx_test.rs"
+
+[[test]]
+name = "procx_test"
+path = "procx_test.rs"
+
+[[test]]
+name = "memx_test"
+path = "memx_test.rs"
+
+[[test]]
+name = "statx_test"
+path = "statx_test.rs"
+
+[[test]]
+name = "termx_test"
+path = "termx_test.rs"
+
+[[test]]
+name = "astx_test"
+path = "astx_test.rs"

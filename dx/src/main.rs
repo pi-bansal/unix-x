@@ -4,6 +4,7 @@ use clap::Parser;
 use diff::{diff_texts, is_binary, FileDiff};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
+use ux_output::{emit, OutMode};
 
 #[derive(Parser)]
 #[command(name = "dx", about = "Structured diff with JSON output for AI agents.", version)]
@@ -22,17 +23,13 @@ struct Cli {
     #[arg(long)]
     no_equal: bool,
 
-    /// Pretty-print output
-    #[arg(short, long)]
-    pretty: bool,
-
-    /// Newline-delimited JSON (one FileDiff per line)
-    #[arg(long)]
-    ndjson: bool,
-
     /// Show summary only (no hunks)
     #[arg(short, long)]
     summary: bool,
+
+    /// Output mode: auto (default), json, pretty, table, ndjson
+    #[arg(short, long, default_value = "auto")]
+    out: String,
 }
 
 #[derive(Serialize)]
@@ -87,7 +84,8 @@ fn main() {
     let total_removed: u32 = file_diffs.iter().map(|f| f.removed_lines).sum();
     let total_files = file_diffs.len();
 
-    if cli.ndjson {
+    // ndjson streams one FileDiff per line.
+    if cli.out == "ndjson" {
         for fd in &file_diffs {
             println!("{}", serde_json::to_string(fd).unwrap());
         }
@@ -101,13 +99,7 @@ fn main() {
         files: file_diffs,
     };
 
-    let json = if cli.pretty {
-        serde_json::to_string_pretty(&output).unwrap()
-    } else {
-        serde_json::to_string(&output).unwrap()
-    };
-
-    println!("{}", json);
+    emit(&output, &OutMode::from_str(&cli.out));
 }
 
 fn diff_files(

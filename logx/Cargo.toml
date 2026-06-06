@@ -16,6 +16,7 @@ regex = "1"
 chrono = { version = "0.4", features = ["serde"] }
 flate2 = "1"       # .gz log reading
 memchr = "2"       # fast line scanning
+ux-output = { path = "../ux-output" }
 
 [profile.release]
 opt-level = 3

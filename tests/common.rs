@@ -35,6 +35,32 @@ pub fn run(name: &str, args: &[&str]) -> Output {
         .unwrap_or_else(|e| panic!("failed to run {}: {} — did you run `cargo build --workspace`?", name, e))
 }
 
+/// Run a binary with its working directory set to `dir` (for tools that read
+/// files relative to the current directory, e.g. envx scanning `.env`).
+#[allow(dead_code)]
+pub fn run_in_dir(dir: &std::path::Path, name: &str, args: &[&str]) -> Output {
+    Command::new(bin(name))
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run {}: {}", name, e))
+}
+
+/// Run a binary in `dir` and parse stdout as JSON, asserting success.
+#[allow(dead_code)]
+pub fn run_json_in_dir(dir: &std::path::Path, name: &str, args: &[&str]) -> Value {
+    let out = run_in_dir(dir, name, args);
+    assert!(
+        out.status.success(),
+        "{} failed with stderr: {}",
+        name,
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    serde_json::from_str(&stdout)
+        .unwrap_or_else(|e| panic!("failed to parse {} output as JSON: {}\noutput: {}", name, e, stdout))
+}
+
 /// Run with --out json to force compact regardless of TTY
 pub fn run_json_forced(name: &str, args: &[&str]) -> Value {
     let mut full_args: Vec<&str> = args.to_vec();

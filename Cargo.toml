@@ -16,6 +16,8 @@ members = [
     "statx",
     "hashx",
     "termx",
+    "astx",
+    "tests",
 ]
 resolver = "2"
 

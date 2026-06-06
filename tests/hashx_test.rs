@@ -69,9 +69,10 @@ fn hashx_blake3_is_correct() {
         &String::from_utf8_lossy(&out.stdout)
     ).unwrap();
     let b3 = v["files"][0]["blake3"].as_str().unwrap();
+    // Official BLAKE3 test vector for empty input.
     assert_eq!(
         b3,
-        "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc5a68cfe47bdded"
+        "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
     );
 }
 

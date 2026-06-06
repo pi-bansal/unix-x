@@ -3,6 +3,7 @@ use serde::Serialize;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use ux_output::{emit, OutMode};
 
 #[derive(Serialize)]
 pub struct ArchiveEntry {
@@ -35,7 +36,7 @@ struct Cli {
     archive: PathBuf,
 
     /// Filter entries by path substring
-    #[arg(short, long)]
+    #[arg(long)]
     filter: Option<String>,
 
     /// List only files (no dirs)
@@ -46,17 +47,13 @@ struct Cli {
     #[arg(short, long, default_value = "name")]
     sort: String,
 
-    /// Pretty-print output
-    #[arg(short, long)]
-    pretty: bool,
-
-    /// Newline-delimited JSON (one entry per line)
-    #[arg(long)]
-    ndjson: bool,
-
     /// Summary only (no entry list)
-    #[arg(short, long)]
+    #[arg(long)]
     summary: bool,
+
+    /// Output mode: auto (default), json, pretty, table, ndjson
+    #[arg(short, long, default_value = "auto")]
+    out: String,
 }
 
 fn main() {
@@ -99,20 +96,35 @@ fn main() {
         info.entries.clear();
     }
 
-    if cli.ndjson {
+    // ndjson streams one entry per line.
+    if cli.out == "ndjson" {
         for entry in &info.entries {
             println!("{}", serde_json::to_string(entry).unwrap());
         }
         return;
     }
 
-    let json = if cli.pretty {
-        serde_json::to_string_pretty(&info).unwrap()
-    } else {
-        serde_json::to_string(&info).unwrap()
-    };
+    if cli.out == "table" {
+        print_table(&info);
+        return;
+    }
 
-    println!("{}", json);
+    emit(&info, &OutMode::from_str(&cli.out));
+}
+
+fn print_table(info: &ArchiveInfo) {
+    println!("format={}  entries={}  uncompressed={}  compressed={}  ratio={}",
+        info.format,
+        info.total_entries,
+        info.total_size_uncompressed,
+        info.total_size_compressed.map(|c| c.to_string()).unwrap_or_else(|| "-".into()),
+        info.compression_ratio.map(|r| format!("{:.3}", r)).unwrap_or_else(|| "-".into()));
+    if !info.entries.is_empty() {
+        println!("{:>12}  {:<8}  {}", "SIZE", "TYPE", "PATH");
+        for e in &info.entries {
+            println!("{:>12}  {:<8}  {}", e.size_uncompressed, e.entry_type, e.path);
+        }
+    }
 }
 
 fn inspect_archive(path: &Path) -> Result<ArchiveInfo, String> {

@@ -157,46 +157,74 @@ pub fn query<'a>(value: &'a Value, steps: &[Step]) -> Vec<&'a Value> {
     }
 }
 
-/// Very simple filter evaluator: ?(@.key == "val") or ?(@.key > N)
+/// Filter evaluator for `?( ... )` expressions.
+///
+/// Supports boolean composition with `&&` and `||` (no nested parentheses),
+/// and the comparison operators `==`, `!=`, `>=`, `<=`, `>`, `<`.
+/// `||` binds looser than `&&`, matching the conventional precedence:
+///   `a && b || c && d`  ==  `(a && b) || (c && d)`
 fn eval_filter(item: &Value, expr: &str) -> bool {
-    // Strip ?( and )
-    let inner = expr
-        .trim_start_matches('?')
-        .trim_start_matches('(')
-        .trim_start_matches('@')
-        .trim_end_matches(')');
+    // Strip the leading `?` and the surrounding `( )`.
+    let inner = expr.trim().trim_start_matches('?').trim();
+    let inner = inner
+        .strip_prefix('(')
+        .and_then(|s| s.strip_suffix(')'))
+        .unwrap_or(inner)
+        .trim();
 
-    // Try == comparison
-    if let Some((path, rhs)) = inner.split_once("==") {
-        let path = path.trim().trim_start_matches('.');
-        let rhs = rhs.trim().trim_matches('"').trim_matches('\'');
-        let steps = parse_path(path);
-        let vals = query(item, &steps);
-        return vals.iter().any(|v| {
-            v.as_str() == Some(rhs)
-                || v.to_string().trim_matches('"') == rhs
-        });
-    }
+    // OR over AND-groups.
+    split_top(inner, "||")
+        .iter()
+        .any(|or_term| split_top(or_term, "&&").iter().all(|factor| eval_comparison(item, factor)))
+}
 
-    // Try > comparison
-    if let Some((path, rhs)) = inner.split_once('>') {
-        let path = path.trim().trim_start_matches('.');
-        if let Ok(threshold) = rhs.trim().parse::<f64>() {
+/// Split on a two-char logical operator. We don't support parentheses inside a
+/// filter, so a simple substring split is sufficient and avoids splitting the
+/// operators that share characters (`>`, `<` never collide with `&&`/`||`).
+fn split_top<'a>(s: &'a str, op: &str) -> Vec<&'a str> {
+    s.split(op).map(|p| p.trim()).collect()
+}
+
+/// Evaluate a single `@.path <op> <literal>` comparison.
+fn eval_comparison(item: &Value, factor: &str) -> bool {
+    // Two-char operators must be tested before their single-char prefixes.
+    for op in ["==", "!=", ">=", "<=", ">", "<"] {
+        if let Some((lhs, rhs)) = factor.split_once(op) {
+            let path = lhs.trim().trim_start_matches('@').trim().trim_start_matches('.');
+            let rhs = rhs.trim();
             let steps = parse_path(path);
             let vals = query(item, &steps);
-            return vals.iter().any(|v| v.as_f64().map(|n| n > threshold).unwrap_or(false));
+            return vals.iter().any(|v| compare(v, op, rhs));
         }
     }
-
-    // Try < comparison
-    if let Some((path, rhs)) = inner.split_once('<') {
-        let path = path.trim().trim_start_matches('.');
-        if let Ok(threshold) = rhs.trim().parse::<f64>() {
-            let steps = parse_path(path);
-            let vals = query(item, &steps);
-            return vals.iter().any(|v| v.as_f64().map(|n| n < threshold).unwrap_or(false));
-        }
-    }
-
     false
+}
+
+/// Compare a JSON value against a literal using the given operator.
+fn compare(val: &Value, op: &str, rhs: &str) -> bool {
+    let rhs_unquoted = rhs.trim_matches('"').trim_matches('\'');
+    let rhs_num = rhs.parse::<f64>().ok();
+
+    match op {
+        "==" | "!=" => {
+            let eq = match (val, rhs_num) {
+                (Value::Number(_), Some(n)) => val.as_f64() == Some(n),
+                _ => {
+                    val.as_str() == Some(rhs_unquoted)
+                        || val.to_string().trim_matches('"') == rhs_unquoted
+                }
+            };
+            if op == "==" { eq } else { !eq }
+        }
+        ">" | ">=" | "<" | "<=" => match (val.as_f64(), rhs_num) {
+            (Some(v), Some(n)) => match op {
+                ">" => v > n,
+                ">=" => v >= n,
+                "<" => v < n,
+                _ => v <= n,
+            },
+            _ => false,
+        },
+        _ => false,
+    }
 }

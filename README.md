@@ -43,6 +43,7 @@ Inspired by how `ripgrep` reimagined `grep` — not a wrapper, a ground-up rethi
 | [`statx`](#statx) | vmstat, iostat, sar, top | Time-series system stats |
 | [`hashx`](#hashx) | md5sum, sha1sum, sha256sum, b3sum | Multi-algorithm file hashing |
 | [`termx`](#termx) | tput, stty, env heuristics | Terminal & TTY inspection |
+| [`astx`](#astx) | ctags, tree-sitter CLI | Source-code AST & symbol extraction |
 
 ---
 
@@ -68,7 +69,7 @@ cd xunix
 cargo build --workspace --release
 
 # All binaries land in target/release/
-cp target/release/{lx,px,logx,dx,arcx,envx,netx,jsonx,procx,idx,diffx,memx,statx,hashx,termx} /usr/local/bin/
+cp target/release/{lx,px,logx,dx,arcx,envx,netx,jsonx,procx,idx,diffx,memx,statx,hashx,termx,astx} /usr/local/bin/
 ```
 
 ---
@@ -259,6 +260,8 @@ jsonx --ndjson-in '.name' logs.ndjson # process NDJSON input
 ```
 
 **Path syntax:** `.key`, `.key.nested`, `.[0]`, `.[]` / `.*` (wildcard), `[1:3]` (slice), `[?(@.key == "val")]`, `[?(@.n > 10)]`, `[?(@.n < 10)]`
+
+**Filter operators:** `==`, `!=`, `>`, `>=`, `<`, `<=`, combined with `&&` and `||` — e.g. `[?(@.git_status == "modified" && @.size > 5000)]` (`||` binds looser than `&&`)
 
 ---
 
@@ -455,6 +458,32 @@ termx --out table                 # human-readable
 
 ---
 
+### astx
+
+**Replaces:** `ctags`, the `tree-sitter` CLI, ad-hoc regex/grammar scraping of source files
+
+Parses a source file into a structured JSON AST using tree-sitter. Agents get real syntax structure — declarations, ranges, node kinds — without screen-scraping a grammar tool's text output.
+
+**Supported languages:** Rust, Python, JavaScript, TypeScript, TSX, Go (detected by extension, override with `--lang`)
+
+```bash
+astx src/main.rs                      # full AST as JSON
+astx src/main.rs --symbols            # declarations only (ctags-style)
+astx src/main.rs --symbols --out table
+astx app.py --kind function_definition   # flat list of nodes by kind
+astx src/lib.rs --depth 2             # cap AST depth
+astx src/main.rs --query '(function_item name: (identifier) @fn)'  # tree-sitter query
+astx script --lang python --symbols   # force a language when there's no extension
+```
+
+**AST node fields:** `kind`, `named`, `start` / `end` (each `{row, col, byte}`), `text` (leaf nodes only), `field` (field name in parent, if any), `children`
+
+**Symbol fields** (`--symbols`): `name`, `kind`, `start`, `end`
+
+**Errors & fallbacks:** a missing file emits `{"error": "...", "path": "..."}` on stderr; an unsupported extension emits a structured `{"unavailable": {...}}` block listing the supported languages — never a crash.
+
+---
+
 ## Composing tools
 
 ```bash
@@ -522,6 +551,7 @@ diffx base.py ours.py theirs.py --out pretty
 | statx | ✓ | ✓ | ✓ |
 | hashx | ✓ | ✓ | ✓ |
 | termx | ✓ | ✓ | ✓ |
+| astx | ✓ | ✓ | ✓ |
 
 "Structured fallback" means the tool returns a JSON `unavailable` block with a reason and platform-specific alternative — never silence, never a crash.
 

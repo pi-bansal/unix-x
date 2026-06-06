@@ -11,6 +11,7 @@ use serde::Serialize;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
 use std::path::PathBuf;
+use ux_output::{emit, OutMode};
 
 #[derive(Parser)]
 #[command(name = "logx", about = "Structured log querying for AI agents.", version)]
@@ -44,20 +45,16 @@ struct Cli {
     head: Option<usize>,
 
     /// Max results to emit
-    #[arg(short = 'l', long, default_value_t = 1000)]
+    #[arg(long, default_value_t = 1000)]
     limit: usize,
 
     /// Force format detection (json, logfmt, nginx, syslog, rails, go, plain)
     #[arg(short, long)]
     format: Option<String>,
 
-    /// Pretty-print output
-    #[arg(short, long)]
-    pretty: bool,
-
-    /// Newline-delimited JSON (one entry per line)
-    #[arg(long)]
-    ndjson: bool,
+    /// Output mode: auto (default), json, pretty, table, ndjson
+    #[arg(short, long, default_value = "auto")]
+    out: String,
 
     /// Emit summary stats only
     #[arg(short, long)]
@@ -230,19 +227,16 @@ fn main() {
         None
     };
 
-    if cli.stats && !cli.ndjson {
-        // Stats-only mode: just print stats
-        let s = stats.as_ref().unwrap();
-        let json = if cli.pretty {
-            serde_json::to_string_pretty(s).unwrap()
-        } else {
-            serde_json::to_string(s).unwrap()
-        };
-        println!("{}", json);
+    let mode = OutMode::from_str(&cli.out);
+
+    if cli.stats && cli.out != "ndjson" {
+        // Stats-only mode: emit just the stats object.
+        emit(stats.as_ref().unwrap(), &mode);
         return;
     }
 
-    if cli.ndjson {
+    // ndjson streams one entry per line.
+    if cli.out == "ndjson" {
         for entry in &entries {
             println!("{}", serde_json::to_string(entry).unwrap());
         }
@@ -252,11 +246,13 @@ fn main() {
     let count = entries.len();
     let output = Output { stats, count, entries };
 
-    let json = if cli.pretty {
-        serde_json::to_string_pretty(&output).unwrap()
-    } else {
-        serde_json::to_string(&output).unwrap()
-    };
+    if cli.out == "table" {
+        println!("{:>6}  {:<6}  {}", "LINE", "LEVEL", "MESSAGE");
+        for e in &output.entries {
+            println!("{:>6}  {:<6}  {}", e.line, e.level.as_deref().unwrap_or("-"), e.message);
+        }
+        return;
+    }
 
-    println!("{}", json);
+    emit(&output, &mode);
 }

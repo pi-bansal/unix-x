@@ -15,6 +15,7 @@ use process::collect_processes;
 use serde::Serialize;
 use sysinfo::System;
 use std::collections::HashMap;
+use ux_output::{emit, OutMode};
 
 #[derive(Parser)]
 #[command(name = "px", about = "Structured process and network inspection for AI agents.", version)]
@@ -32,7 +33,7 @@ struct Cli {
     port: Option<u16>,
 
     /// Show network connections
-    #[arg(short = 'n', long)]
+    #[arg(long)]
     network: bool,
 
     /// Only show listening ports
@@ -44,20 +45,16 @@ struct Cli {
     env: bool,
 
     /// Limit number of results
-    #[arg(short = 'l', long, default_value_t = 50)]
+    #[arg(long, default_value_t = 50)]
     limit: usize,
-
-    /// Pretty-print output
-    #[arg(short, long)]
-    pretty: bool,
-
-    /// Newline-delimited JSON
-    #[arg(long)]
-    ndjson: bool,
 
     /// Show system summary (cpu, memory, load)
     #[arg(short, long)]
     system: bool,
+
+    /// Output mode: auto (default), json, pretty, table, ndjson
+    #[arg(short, long, default_value = "auto")]
+    out: String,
 }
 
 #[derive(Serialize)]
@@ -189,7 +186,10 @@ fn main() {
         count,
     };
 
-    if cli.ndjson {
+    let mode = OutMode::from_str(&cli.out);
+
+    // ndjson streams the inner entries (processes, then connections), one per line.
+    if cli.out == "ndjson" {
         if let Some(ref procs) = output.processes {
             for p in procs {
                 println!("{}", serde_json::to_string(p).unwrap());
@@ -203,11 +203,41 @@ fn main() {
         return;
     }
 
-    let json = if cli.pretty {
-        serde_json::to_string_pretty(&output).unwrap()
-    } else {
-        serde_json::to_string(&output).unwrap()
-    };
+    if cli.out == "table" {
+        print_table(&output);
+        return;
+    }
 
-    println!("{}", json);
+    emit(&output, &mode);
+}
+
+fn print_table(output: &Output) {
+    if let Some(ref sys) = output.system {
+        println!("cpu={:.1}%  mem={}/{} MB  load={:.2} {:.2} {:.2}  uptime={}s",
+            sys.global_cpu_percent,
+            sys.used_memory_bytes / 1_048_576,
+            sys.total_memory_bytes / 1_048_576,
+            sys.load_avg_1m, sys.load_avg_5m, sys.load_avg_15m,
+            sys.uptime_secs);
+    }
+    if let Some(ref procs) = output.processes {
+        println!("{:>8}  {:>6}  {:>10}  {}", "PID", "CPU%", "MEM(MB)", "NAME");
+        for p in procs {
+            println!("{:>8}  {:>6.1}  {:>10}  {}",
+                p.pid, p.cpu_percent, p.memory_bytes / 1_048_576, p.name);
+        }
+    }
+    if let NetworkResult::Available(ref conns) = output.connections {
+        if !conns.is_empty() {
+            println!("{:>6}  {:<22}  {:<22}  {:<10}  {}", "PROTO", "LOCAL", "REMOTE", "STATE", "PID");
+            for c in conns {
+                println!("{:>6}  {:<22}  {:<22}  {:<10}  {}",
+                    c.protocol,
+                    format!("{}:{}", c.local_addr, c.local_port),
+                    c.remote_addr.as_deref().map(|a| format!("{}:{}", a, c.remote_port.unwrap_or(0))).unwrap_or_else(|| "-".into()),
+                    c.state.as_deref().unwrap_or("-"),
+                    c.pid.map(|p| p.to_string()).unwrap_or_else(|| "-".into()));
+            }
+        }
+    }
 }

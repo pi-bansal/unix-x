@@ -19,7 +19,7 @@ cp target/release/lx /usr/local/bin/lx
 lx
 
 # Specific path, pretty-printed
-lx ./src --pretty
+lx ./src --out pretty
 
 # Deeper traversal
 lx . --depth 4
@@ -31,7 +31,7 @@ lx . --files-only --ext rs
 lx . --all --no-gitignore
 
 # Newline-delimited JSON (pipe-friendly)
-lx . --ndjson | jq 'select(.type == "file" and .size > 10000)'
+lx . --out ndjson | jsonx '[?(@.type == "file" && @.size > 10000)]'
 
 # No git status (faster on large repos)
 lx . --no-git
@@ -39,7 +39,7 @@ lx . --no-git
 
 ## Output
 
-Compact JSON by default. `--pretty` for humans.
+Compact JSON by default (auto-pretty when stdout is a terminal). `--out pretty` for humans.
 
 ```json
 {
@@ -74,12 +74,12 @@ Compact JSON by default. `--pretty` for humans.
 
 ## Design principles
 
-- **JSON first**: compact by default, `--pretty` is the flag
+- **JSON first**: compact by default, `--out pretty` for humans
 - **Timestamps as integers**: unix epoch, let callers format
 - **Errors are structured**: stderr JSON, never raw text blobs
 - **Recursive sizes for dirs**: agents need real sizes, not dir inode size
 - **Git-aware by default**: status per entry, disable with `--no-git`
-- **`--ndjson` for streaming**: pipe into `jq`, `grep`, etc.
+- **`--out ndjson` for streaming**: pipe into `jsonx`, `grep`, etc.
 - **Static binary**: no runtime deps, deploy anywhere
 
 ## Flags
@@ -91,8 +91,7 @@ Compact JSON by default. `--pretty` for humans.
 | `--all` / `-a` | off | Include hidden files |
 | `--no-gitignore` | off | Don't respect .gitignore |
 | `--no-git` | off | Skip git status (faster) |
-| `--pretty` / `-p` | off | Pretty-print JSON |
-| `--ndjson` | off | One JSON object per line |
+| `--out` / `-o` | `auto` | Output mode: auto, json, pretty, table, ndjson |
 | `--files-only` / `-f` | off | Omit directories |
 | `--ext` / `-e` | none | Filter by extension |
 

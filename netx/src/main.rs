@@ -72,8 +72,8 @@ struct Cli {
     #[arg(short = 'I', long)]
     head_only: bool,
 
-    /// Output: json (default), pretty, table, ndjson
-    #[arg(short, long, default_value = "json")]
+    /// Output mode: auto (default), json, pretty, table, ndjson
+    #[arg(short, long, default_value = "auto")]
     out: String,
 }
 
@@ -206,6 +206,12 @@ fn parse_body(resp: ureq::Response, content_type: &str) -> ResponseBody {
 }
 
 fn emit(output: &Response, mode: &str) {
+    // Resolve `auto`: pretty on a terminal, compact when piped.
+    let mode = if mode == "auto" {
+        if ux_output::is_tty() { "pretty" } else { "json" }
+    } else {
+        mode
+    };
     match mode {
         "pretty" => println!("{}", serde_json::to_string_pretty(output).unwrap()),
         "table" => {
