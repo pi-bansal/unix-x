@@ -2,7 +2,7 @@
 name = "ux-output"
 version = "0.1.0"
 edition = "2021"
-description = "Shared output logic for xunix tools"
+description = "Shared output logic for aitoolx tools"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

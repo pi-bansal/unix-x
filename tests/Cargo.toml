@@ -7,7 +7,7 @@
 #   cargo build --workspace && cargo test --workspace
 
 [package]
-name = "xunix-tests"
+name = "aitoolx-tests"
 version = "0.1.0"
 edition = "2021"
 autotests = false
@@ -15,7 +15,7 @@ autotests = false
 # Empty stub library: gives the package a primary target. The real work is in
 # the [[test]] integration binaries below, which shell out to the built tools.
 [lib]
-name = "xunix_tests"
+name = "aitoolx_tests"
 path = "lib.rs"
 
 [dev-dependencies]
