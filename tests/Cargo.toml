@@ -77,3 +77,7 @@ path = "astx_test.rs"
 [[test]]
 name = "dnsx_test"
 path = "dnsx_test.rs"
+
+[[test]]
+name = "confx_test"
+path = "confx_test.rs"

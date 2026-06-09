@@ -45,6 +45,7 @@ Inspired by how `ripgrep` reimagined `grep` — not a wrapper, a ground-up rethi
 | [`termx`](#termx) | tput, stty, env heuristics | Terminal & TTY inspection |
 | [`astx`](#astx) | ctags, tree-sitter CLI | Source-code AST & symbol extraction |
 | [`dnsx`](#dnsx) | dig, nslookup, host | Structured DNS lookups |
+| [`confx`](#confx) | yq, manual config parsing | YAML/TOML/INI/.properties to JSON |
 
 ---
 
@@ -70,7 +71,7 @@ cd aitoolx
 cargo build --workspace --release
 
 # All binaries land in target/release/
-cp target/release/{lx,px,logx,dx,arcx,envx,netx,jsonx,procx,idx,diffx,memx,statx,hashx,termx,astx,dnsx} /usr/local/bin/
+cp target/release/{lx,px,logx,dx,arcx,envx,netx,jsonx,procx,idx,diffx,memx,statx,hashx,termx,astx,dnsx,confx} /usr/local/bin/
 ```
 
 ---
@@ -510,6 +511,30 @@ dnsx example.com --type MX --out table
 
 ---
 
+### confx
+
+**Replaces:** `yq`, and the hand-rolled parsing agents fall back to for non-JSON configs
+
+`jsonx` queries JSON, but configs come as YAML, TOML, INI, and `.properties`. `confx` parses all of them into JSON so an agent can read any config uniformly — and pipe the result straight into `jsonx`. JSON itself passes through, making `confx` a single front door for every config format.
+
+```bash
+confx app.yaml                        # auto-detect by extension
+confx Cargo.toml --out pretty
+confx settings.ini                    # one object per [section]
+confx db.properties                   # flat key/value object
+confx mystery --format toml           # force a format when extension is unknown
+confx app.yaml --raw | jsonx '.server.port'   # pipe parsed config into jsonx
+confx a.yaml b.toml c.ini             # parse several files at once
+```
+
+**Supported formats:** YAML (`.yaml`/`.yml`, multi-doc → array), TOML (`.toml`), INI (`.ini`/`.cfg`/`.conf`), `.properties`, and JSON (`.json`, pass-through). INI and `.properties` are untyped, so their values are emitted as strings.
+
+**Output fields:** single file → `path`, `format`, `data` (or `error`); with `--raw`, just the parsed value. Multiple files → `count`, `files[]`.
+
+**Errors & fallbacks:** a missing file, parse error, or unknown extension (with no `--format`) yields a structured `error` — on stderr for `--raw`, otherwise an `error` field per file — and a non-zero exit code.
+
+---
+
 ## Composing tools
 
 ```bash
@@ -551,6 +576,9 @@ memx $(pgrep myapp) --kind heap --out table
 
 # Three-way merge for an agent patch application
 diffx base.py ours.py theirs.py --out pretty
+
+# Read a YAML config's port without a YAML parser
+confx app.yaml --raw | jsonx '.server.port' --raw
 ```
 
 ---
@@ -579,6 +607,7 @@ diffx base.py ours.py theirs.py --out pretty
 | termx | ✓ | ✓ | ✓ |
 | astx | ✓ | ✓ | ✓ |
 | dnsx | ✓ | ✓ | ✓ |
+| confx | ✓ | ✓ | ✓ |
 
 "Structured fallback" means the tool returns a JSON `unavailable` block with a reason and platform-specific alternative — never silence, never a crash.
 

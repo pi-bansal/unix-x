@@ -5,7 +5,7 @@ set -euo pipefail
 
 REPO="pi-bansal/aitoolx"
 INSTALL_DIR="${AITOOLX_INSTALL_DIR:-/usr/local/bin}"
-TOOLS=(lx px logx dx arcx envx netx jsonx procx idx diffx memx statx hashx termx astx dnsx)
+TOOLS=(lx px logx dx arcx envx netx jsonx procx idx diffx memx statx hashx termx astx dnsx confx)
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
