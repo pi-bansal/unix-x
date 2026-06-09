@@ -69,6 +69,22 @@ pub fn emit_ndjson(v: &serde_json::Value) {
     }
 }
 
+/// Restore default SIGPIPE behavior so a tool exits quietly when the reader
+/// closes the pipe early (`tool | head`, `tool | grep -q`, `… | less` then `q`),
+/// exactly like a standard Unix utility.
+///
+/// Rust sets SIGPIPE to `SIG_IGN` at startup, which turns a closed-pipe write
+/// into an `EPIPE` error and makes `println!` panic ("failed printing to stdout:
+/// Broken pipe"). Resetting to `SIG_DFL` makes the process terminate on the
+/// signal instead, matching `ls`/`grep`/`jq`. Call this as the first line of
+/// `main()` in every tool.
+pub fn reset_sigpipe() {
+    #[cfg(unix)]
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+}
+
 pub fn is_tty() -> bool {
     #[cfg(unix)]
     {

@@ -146,6 +146,7 @@ enum Cmd {
 
 #[tokio::main]
 async fn main() {
+    ux_output::reset_sigpipe();
     let cli = Cli::parse();
 
     match cli.command {

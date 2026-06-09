@@ -95,6 +95,7 @@ fn level_rank(level: &str) -> u8 {
 }
 
 fn main() {
+    ux_output::reset_sigpipe();
     let cli = Cli::parse();
 
     // Open input

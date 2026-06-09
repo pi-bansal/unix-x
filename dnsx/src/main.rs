@@ -165,6 +165,7 @@ fn to_record(name: String, ttl: u32, rtype: RecordType, data: &RData) -> Record 
 }
 
 fn main() {
+    ux_output::reset_sigpipe();
     let cli = Cli::parse();
     let mode = OutMode::from_str(&cli.out);
 

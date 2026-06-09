@@ -41,6 +41,7 @@ struct Output {
 }
 
 fn main() {
+    ux_output::reset_sigpipe();
     let cli = Cli::parse();
 
     let old_path = &cli.old;

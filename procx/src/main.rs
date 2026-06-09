@@ -40,6 +40,7 @@ struct Output {
 }
 
 fn main() {
+    ux_output::reset_sigpipe();
     let cli = Cli::parse();
     let mode = OutMode::from_str(&cli.out);
     let want = cli.source.as_deref();

@@ -57,6 +57,7 @@ struct Cli {
 }
 
 fn main() {
+    ux_output::reset_sigpipe();
     let cli = Cli::parse();
 
     let path = &cli.archive;

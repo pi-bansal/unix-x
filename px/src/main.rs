@@ -83,6 +83,7 @@ struct Output {
 }
 
 fn main() {
+    ux_output::reset_sigpipe();
     let cli = Cli::parse();
 
     let mut sys = System::new_all();

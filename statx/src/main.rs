@@ -109,6 +109,7 @@ fn socket_path() -> std::path::PathBuf {
 
 #[tokio::main]
 async fn main() {
+    ux_output::reset_sigpipe();
     let cli = Cli::parse();
 
     match cli.command {
@@ -209,8 +210,19 @@ async fn run_daemon(interval_secs: u64, capacity: usize) {
     // Unix socket server
     let sock_path = socket_path();
     let _ = std::fs::remove_file(&sock_path);
-    let listener = tokio::net::UnixListener::bind(&sock_path)
-        .expect("failed to bind socket");
+    let listener = match tokio::net::UnixListener::bind(&sock_path) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!(
+                "{}",
+                serde_json::json!({
+                    "error": format!("failed to bind socket: {e}"),
+                    "path": sock_path.display().to_string(),
+                })
+            );
+            std::process::exit(1);
+        }
+    };
     eprintln!("[statx] Socket: {}", sock_path.display());
 
     loop {
@@ -300,7 +312,9 @@ fn metric_summary(values: &[f64]) -> MetricSummary {
     if values.is_empty() { return zero_summary(); }
 
     let mut sorted = values.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    // total_cmp orders NaN deterministically instead of panicking like
+    // partial_cmp().unwrap() does when a kernel counter is reported as NaN.
+    sorted.sort_by(|a, b| a.total_cmp(b));
 
     let min = sorted.first().copied().unwrap_or(0.0);
     let max = sorted.last().copied().unwrap_or(0.0);

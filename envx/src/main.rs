@@ -72,6 +72,7 @@ struct Cli {
 }
 
 fn main() {
+    ux_output::reset_sigpipe();
     let cli = Cli::parse();
 
     let mut vars: Vec<EnvVar> = Vec::new();

@@ -53,6 +53,7 @@ struct Cli {
 }
 
 fn main() {
+    ux_output::reset_sigpipe();
     let cli = Cli::parse();
 
     let input = match &cli.file {
@@ -61,8 +62,13 @@ fn main() {
             std::process::exit(1);
         }),
         None => {
+            // read_to_string errors on non-UTF-8 stdin; surface it as a
+            // structured error instead of panicking.
             let mut s = String::new();
-            io::stdin().read_to_string(&mut s).unwrap();
+            if let Err(e) = io::stdin().read_to_string(&mut s) {
+                eprintln!("{}", serde_json::json!({ "error": e.to_string() }));
+                std::process::exit(1);
+            }
             s
         }
     };
