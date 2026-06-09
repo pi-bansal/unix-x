@@ -81,3 +81,11 @@ path = "dnsx_test.rs"
 [[test]]
 name = "confx_test"
 path = "confx_test.rs"
+
+[[test]]
+name = "logx_test"
+path = "logx_test.rs"
+
+[[test]]
+name = "idx_test"
+path = "idx_test.rs"

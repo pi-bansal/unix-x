@@ -9,7 +9,6 @@ use std::sync::{Arc, RwLock};
 use ux_output::{emit, OutMode};
 
 const DEFAULT_RING_SIZE: usize = 3600; // 1 hour at 1s intervals
-const SOCKET_NAME: &str = "statx.sock";
 
 #[derive(Parser)]
 #[command(
@@ -104,7 +103,16 @@ struct LastOutput {
 }
 
 fn socket_path() -> std::path::PathBuf {
-    std::env::temp_dir().join(SOCKET_NAME)
+    // Per-user socket in the runtime dir so concurrent users don't collide on a
+    // single world-shared /tmp/statx.sock (one daemon per user is the design;
+    // the client discovers it by this same well-known path).
+    let dir = std::env::var_os("XDG_RUNTIME_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir);
+    let who = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "user".into());
+    dir.join(format!("statx-{who}.sock"))
 }
 
 #[tokio::main]

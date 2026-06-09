@@ -15,6 +15,23 @@ mod tests {
     }
 
     #[test]
+    fn preserves_trailing_newline() {
+        // Inputs end with a newline — a clean merge must round-trip it.
+        let result = three_way_merge("a\nb\nc\n", "a\nB\nc\n", "a\nb\nc\n");
+        assert!(result.clean);
+        let resolved = result.resolved.unwrap();
+        assert_eq!(resolved, "a\nB\nc\n", "trailing newline should be preserved");
+    }
+
+    #[test]
+    fn no_trailing_newline_when_inputs_lack_one() {
+        let result = three_way_merge("a\nb\nc", "a\nB\nc", "a\nb\nc");
+        assert!(result.clean);
+        let resolved = result.resolved.unwrap();
+        assert_eq!(resolved, "a\nB\nc", "should not invent a trailing newline");
+    }
+
+    #[test]
     fn ours_only_change_is_clean() {
         let base   = "line1\nline2\nline3\n";
         let ours   = "line1\nMODIFIED\nline3\n";

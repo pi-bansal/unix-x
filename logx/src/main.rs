@@ -131,13 +131,15 @@ fn main() {
     let format_name = format!("{:?}", format).to_lowercase();
 
     // Apply tail/head slicing
-    let lines_slice: &[String] = match (cli.tail, cli.head) {
+    // Track where the slice begins in the original input so emitted line numbers
+    // stay file-absolute under --tail/--head instead of restarting at 1.
+    let (line_offset, lines_slice): (usize, &[String]) = match (cli.tail, cli.head) {
         (Some(n), _) => {
             let start = all_lines.len().saturating_sub(n);
-            &all_lines[start..]
+            (start, &all_lines[start..])
         }
-        (_, Some(n)) => &all_lines[..n.min(all_lines.len())],
-        _ => &all_lines,
+        (_, Some(n)) => (0, &all_lines[..n.min(all_lines.len())]),
+        _ => (0, &all_lines),
     };
 
     // Build filters
@@ -160,7 +162,7 @@ fn main() {
         }
         total_lines += 1;
 
-        let mut entry = parse_line(line, i as u64 + 1, &format);
+        let mut entry = parse_line(line, (line_offset + i) as u64 + 1, &format);
 
         // Count by level
         match entry.level.as_deref() {

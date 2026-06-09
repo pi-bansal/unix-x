@@ -96,19 +96,43 @@ pub async fn run_daemon(root: PathBuf, respect_gitignore: bool) {
     // Remove stale socket
     let _ = std::fs::remove_file(&sock_path);
 
-    let listener = UnixListener::bind(&sock_path).expect("failed to bind socket");
+    let listener = match UnixListener::bind(&sock_path) {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!(
+                "{}",
+                serde_json::json!({
+                    "error": format!("failed to bind socket: {e}"),
+                    "path": sock_path.to_string_lossy(),
+                })
+            );
+            std::process::exit(1);
+        }
+    };
     eprintln!("[idx] Listening on {}", sock_path.display());
 
     // ── File watcher ─────────────────────────────────────────────────────────
     let (tx, mut rx) = mpsc::channel::<notify::Result<Event>>(256);
     let root_clone = root.clone();
 
-    let mut watcher = RecommendedWatcher::new(
+    let mut watcher = match RecommendedWatcher::new(
         move |res| { let _ = tx.blocking_send(res); },
         notify::Config::default(),
-    ).expect("watcher init failed");
+    ) {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("{}", serde_json::json!({"error": format!("watcher init failed: {e}")}));
+            std::process::exit(1);
+        }
+    };
 
-    watcher.watch(&root, RecursiveMode::Recursive).expect("watch failed");
+    if let Err(e) = watcher.watch(&root, RecursiveMode::Recursive) {
+        eprintln!(
+            "{}",
+            serde_json::json!({"error": format!("watch failed: {e}"), "path": root.to_string_lossy()})
+        );
+        std::process::exit(1);
+    }
 
     let state_for_watcher = state.clone();
     let root_for_rebuild = root.clone();
@@ -176,12 +200,12 @@ async fn handle_client(
     while let Ok(Some(line)) = lines.next_line().await {
         let response = match serde_json::from_str::<Request>(&line) {
             Ok(Request::Query(q)) => {
-                let st = state.read().unwrap();
+                let st = state.read().unwrap_or_else(|e| e.into_inner());
                 let result = run_query(&st.index, &st.bloom, &q);
                 Response::QueryResult(result)
             }
             Ok(Request::Status) => {
-                let st = state.read().unwrap();
+                let st = state.read().unwrap_or_else(|e| e.into_inner());
                 Response::Status(DaemonStatus {
                     root: root.clone(),
                     indexed_files: st.index.len,
@@ -195,11 +219,14 @@ async fn handle_client(
                 let state_clone = state.clone();
                 let root_clone = root.clone();
                 tokio::spawn(async move {
-                    let build = tokio::task::spawn_blocking(move || {
+                    let build = match tokio::task::spawn_blocking(move || {
                         build_index(Path::new(&root_clone), true)
-                    }).await.unwrap();
+                    }).await {
+                        Ok(b) => b,
+                        Err(e) => { eprintln!("[idx] rebuild task failed: {e}"); return; }
+                    };
 
-                    let mut st = state_clone.write().unwrap();
+                    let mut st = state_clone.write().unwrap_or_else(|e| e.into_inner());
                     st.index = build.index;
                     st.bloom = build.bloom;
                     eprintln!("[idx] Rebuild complete: {} entries", st.index.len);
@@ -227,11 +254,14 @@ async fn apply_incremental_updates(
     // For small changes: update individual rows.
     if changed.len() > 100 {
         let root = root.to_path_buf();
-        let build = tokio::task::spawn_blocking(move || {
+        let build = match tokio::task::spawn_blocking(move || {
             build_index(&root, respect_gitignore)
-        }).await.unwrap();
+        }).await {
+            Ok(b) => b,
+            Err(e) => { eprintln!("[idx] rebuild task failed: {e}"); return; }
+        };
 
-        let mut st = state.write().unwrap();
+        let mut st = state.write().unwrap_or_else(|e| e.into_inner());
         st.index = build.index;
         st.bloom = build.bloom;
         eprintln!("[idx] Full rebuild: {} entries", st.index.len);

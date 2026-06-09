@@ -81,74 +81,120 @@ fn main() {
     ux_output::reset_sigpipe();
     let cli = Cli::parse();
 
+    // redirects(0): follow manually so the redirect chain can be recorded
+    // instead of being swallowed silently by ureq.
     let agent = ureq::AgentBuilder::new()
         .timeout(std::time::Duration::from_secs(cli.timeout))
-        .redirects(cli.follow)
+        .redirects(0)
         .build();
 
     let method = cli.method.to_uppercase();
-    let mut req = agent.request(&method, &cli.url);
-
-    // Headers
-    for h in &cli.header {
-        if let Some((k, v)) = h.split_once(':') {
-            req = req.set(k.trim(), v.trim());
-        }
-    }
-
-    if cli.json {
-        req = req.set("Content-Type", "application/json");
-    }
-
+    let mut current_url = cli.url.clone();
+    let mut redirects: Vec<RedirectEntry> = Vec::new();
     let start = Instant::now();
 
-    let result = if let Some(ref body) = cli.data {
-        req.send_string(body)
-    } else {
-        req.call()
+    let resp = loop {
+        let mut req = agent.request(&method, &current_url);
+        for h in &cli.header {
+            if let Some((k, v)) = h.split_once(':') {
+                req = req.set(k.trim(), v.trim());
+            }
+        }
+        if cli.json {
+            req = req.set("Content-Type", "application/json");
+        }
+
+        let result = if let Some(ref body) = cli.data {
+            req.send_string(body)
+        } else {
+            req.call()
+        };
+
+        // A 3xx with a Location we should follow; otherwise the final response.
+        // ureq may surface 3xx as either Ok or Err(Status) depending on version,
+        // so handle redirects in both arms.
+        match result {
+            Ok(r) => {
+                if follow(&r, &mut redirects, &mut current_url, cli.follow) {
+                    continue;
+                }
+                break r;
+            }
+            Err(ureq::Error::Status(_, r)) => {
+                if follow(&r, &mut redirects, &mut current_url, cli.follow) {
+                    continue;
+                }
+                break r;
+            }
+            Err(e) => {
+                eprintln!(
+                    "{}",
+                    serde_json::to_string(&serde_json::json!({
+                        "error": e.to_string(),
+                        "url": current_url,
+                    }))
+                    .unwrap()
+                );
+                std::process::exit(1);
+            }
+        }
     };
 
     let elapsed = start.elapsed().as_millis();
-
-    let resp = match result {
-        Ok(r) => r,
-        Err(ureq::Error::Status(code, r)) => {
-            // Still parse error responses
-            process_response(r, &cli, elapsed, &method);
-            return;
-        }
-        Err(e) => {
-            eprintln!(
-                "{}",
-                serde_json::to_string(&serde_json::json!({
-                    "error": e.to_string(),
-                    "url": cli.url
-                }))
-                .unwrap()
-            );
-            std::process::exit(1);
-        }
-    };
-
-    process_response(resp, &cli, elapsed, &method);
+    process_response(resp, &cli, elapsed, &method, redirects);
 }
 
-fn process_response(resp: ureq::Response, cli: &Cli, elapsed_ms: u128, method: &str) {
+/// If `resp` is a redirect we're still allowed to follow, record the hop and
+/// advance `current_url`, returning true. Otherwise return false (final response).
+fn follow(
+    resp: &ureq::Response,
+    redirects: &mut Vec<RedirectEntry>,
+    current_url: &mut String,
+    max: u32,
+) -> bool {
+    let code = resp.status();
+    if (300..400).contains(&code) && (redirects.len() as u32) < max {
+        if let Some(loc) = resp.header("location") {
+            redirects.push(RedirectEntry { url: current_url.clone(), status: code });
+            *current_url = resolve_url(current_url, loc);
+            return true;
+        }
+    }
+    false
+}
+
+/// Resolve a possibly-relative Location header against the current URL.
+fn resolve_url(base: &str, location: &str) -> String {
+    if let Ok(abs) = url::Url::parse(location) {
+        return abs.to_string();
+    }
+    if let Ok(b) = url::Url::parse(base) {
+        if let Ok(joined) = b.join(location) {
+            return joined.to_string();
+        }
+    }
+    location.to_string()
+}
+
+fn process_response(
+    resp: ureq::Response,
+    cli: &Cli,
+    elapsed_ms: u128,
+    method: &str,
+    redirects: Vec<RedirectEntry>,
+) {
     let status = resp.status();
     let status_text = resp.status_text().to_string();
     let content_type = resp.content_type().to_string();
     let url = resp.get_url().to_string();
 
+    // Capture all response headers (ureq 2.x exposes header names). Multiple
+    // values for one name (e.g. set-cookie) are joined with ", ".
     let mut headers: HashMap<String, String> = HashMap::new();
-    // ureq doesn't expose header names directly; capture known useful ones
-    for name in &[
-        "content-type", "content-length", "content-encoding",
-        "server", "date", "cache-control", "etag",
-        "x-request-id", "x-ratelimit-remaining", "location",
-        "set-cookie", "transfer-encoding",
-    ] {
-        if let Some(val) = resp.header(name) {
-            headers.insert(name.to_string(), val.to_string());
+    for name in resp.headers_names() {
+        let values = resp.all(&name);
+        if !values.is_empty() {
+            headers.insert(name.clone(), values.join(", "));
         }
     }
 
@@ -175,7 +221,7 @@ fn process_response(resp: ureq::Response, cli: &Cli, elapsed_ms: u128, method: &
         body_bytes,
         body,
         timing: Timing { total_ms: elapsed_ms },
-        redirects: vec![], // ureq follows silently; expose final URL
+        redirects,
     };
 
     emit(&output, &cli.out);

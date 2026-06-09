@@ -68,7 +68,8 @@ enum Cmd {
         mtime_gt: Option<u64>,
 
         /// Path must contain this substring
-        #[arg(short, long)]
+        // `-f` is taken by --files; filter is long-only to avoid a clap collision.
+        #[arg(long)]
         filter: Option<String>,
 
         /// Only directories
@@ -124,7 +125,8 @@ enum Cmd {
         #[arg(long)]
         size_lt: Option<u64>,
 
-        #[arg(short, long)]
+        // `-f` is taken by --files; filter is long-only to avoid a clap collision.
+        #[arg(long)]
         filter: Option<String>,
 
         #[arg(short, long)]

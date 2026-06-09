@@ -168,10 +168,16 @@ fn inspect_zip(path: &Path) -> Result<ArchiveInfo, String> {
 
         let dt = entry.last_modified();
         let modified = {
-            // Approximate: seconds since 1970 from zip datetime
-            let year = dt.year() as u64;
-            let days = (year - 1970) * 365 + dt.month() as u64 * 30 + dt.day() as u64;
-            Some(days * 86400 + dt.hour() as u64 * 3600 + dt.minute() as u64 * 60 + dt.second() as u64)
+            // ZIP stores local time without a timezone; treat it as UTC (the
+            // conventional approximation). days_from_civil handles leap years and
+            // real month lengths — the old year*365 + month*30 math did not, so
+            // timestamps drifted by days-to-weeks.
+            let days = days_from_civil(dt.year() as i64, dt.month() as u32, dt.day() as u32);
+            let secs = days * 86_400
+                + dt.hour() as i64 * 3600
+                + dt.minute() as i64 * 60
+                + dt.second() as i64;
+            (secs >= 0).then_some(secs as u64)
         };
 
         let permissions = entry.unix_mode().map(|m| format!("{:03o}", m & 0o777));
@@ -304,4 +310,37 @@ fn inspect_gz(path: &Path) -> Result<ArchiveInfo, String> {
             link_target: None,
         }],
     })
+}
+
+/// Days from 1970-01-01 to a proleptic-Gregorian date (Howard Hinnant's
+/// `days_from_civil`). Correct across leap years and varying month lengths.
+fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = (if y >= 0 { y } else { y - 399 }) / 400;
+    let yoe = y - era * 400; // [0, 399]
+    let mp: i64 = if m > 2 { (m - 3) as i64 } else { (m + 9) as i64 }; // Mar=0..Feb=11
+    let doy = (153 * mp + 2) / 5 + d as i64 - 1; // [0, 365]
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy; // [0, 146096]
+    era * 146097 + doe - 719468
+}
+
+#[cfg(test)]
+mod tests {
+    use super::days_from_civil;
+
+    #[test]
+    fn known_epoch_days() {
+        assert_eq!(days_from_civil(1970, 1, 1), 0);
+        assert_eq!(days_from_civil(1970, 1, 2), 1);
+        assert_eq!(days_from_civil(2000, 1, 1), 10957);
+        assert_eq!(days_from_civil(2021, 1, 1), 18628); // 18628 * 86400 = 1609459200
+    }
+
+    #[test]
+    fn handles_leap_years() {
+        // Feb 29 exists in 2024 and is exactly one day before Mar 1 — the old
+        // year*365 + month*30 + day formula got this systematically wrong.
+        assert_eq!(days_from_civil(2024, 3, 1), days_from_civil(2024, 2, 29) + 1);
+        assert_eq!(days_from_civil(2024, 2, 29), days_from_civil(2024, 2, 28) + 1);
+    }
 }

@@ -208,7 +208,16 @@ pub fn three_way_merge(base: &str, ours: &str, theirs: &str) -> MergeResult {
 
     let clean = conflict_count == 0;
     let resolved = if clean {
-        Some(resolved_lines.join("\n"))
+        let mut text = resolved_lines.join("\n");
+        // `.lines()` strips the trailing newline; restore it when the inputs had
+        // one so a clean merge round-trips byte-for-byte instead of silently
+        // dropping the final newline.
+        let had_trailing_newline =
+            ours.ends_with('\n') || theirs.ends_with('\n') || base.ends_with('\n');
+        if had_trailing_newline && !text.is_empty() {
+            text.push('\n');
+        }
+        Some(text)
     } else {
         None
     };
