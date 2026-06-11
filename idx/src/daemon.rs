@@ -20,6 +20,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::UNIX_EPOCH;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+#[cfg(unix)]
 use tokio::net::UnixListener;
 use tokio::sync::mpsc;
 
@@ -77,6 +78,18 @@ pub fn socket_path(root: &Path) -> PathBuf {
 
 // ── Daemon entry point ────────────────────────────────────────────────────────
 
+#[cfg(not(unix))]
+pub async fn run_daemon(_root: PathBuf, _respect_gitignore: bool) {
+    let u = ux_output::Unavailable::new(
+        "idx daemon",
+        "background daemon mode (Unix socket IPC + filesystem watching) is only implemented on Unix platforms",
+        Some("use `idx once` for one-shot indexed queries without a daemon"),
+    );
+    eprintln!("{}", serde_json::json!({"unavailable": u}));
+    std::process::exit(1);
+}
+
+#[cfg(unix)]
 pub async fn run_daemon(root: PathBuf, respect_gitignore: bool) {
     eprintln!("[idx] Building initial index for {} ...", root.display());
 
@@ -188,6 +201,7 @@ pub async fn run_daemon(root: PathBuf, respect_gitignore: bool) {
     }
 }
 
+#[cfg(unix)]
 async fn handle_client(
     stream: tokio::net::UnixStream,
     state: Arc<RwLock<SharedState>>,
@@ -244,6 +258,7 @@ async fn handle_client(
 
 /// Apply incremental updates for a set of changed paths.
 /// For small changesets this is much faster than a full rebuild.
+#[cfg(unix)]
 async fn apply_incremental_updates(
     state: &Arc<RwLock<SharedState>>,
     root: &Path,
