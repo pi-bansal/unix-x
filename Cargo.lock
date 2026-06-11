@@ -42,7 +42,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "aitoolx-tests"
+name = "aiutilx-tests"
 version = "0.1.0"
 dependencies = [
  "serde_json",

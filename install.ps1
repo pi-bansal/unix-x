@@ -1,14 +1,14 @@
-# aitoolx installer for Windows (PowerShell)
-# Run: iwr https://raw.githubusercontent.com/pi-bansal/aitoolx/main/install.ps1 | iex
+# aiutilx installer for Windows (PowerShell)
+# Run: iwr https://raw.githubusercontent.com/pi-bansal/aiutilx/main/install.ps1 | iex
 
-$Repo    = "pi-bansal/aitoolx"
-$InstallDir = if ($env:AITOOLX_INSTALL_DIR) { $env:AITOOLX_INSTALL_DIR } else { "$env:USERPROFILE\.aitoolx\bin" }
+$Repo    = "pi-bansal/aiutilx"
+$InstallDir = if ($env:AIUTILX_INSTALL_DIR) { $env:AIUTILX_INSTALL_DIR } else { "$env:USERPROFILE\.aiutilx\bin" }
 $Tools   = @("lx","px","logx","dx","arcx","envx","netx","jsonx","procx","idx","diffx","memx","statx","hashx","termx","astx","dnsx","confx")
 $Arch    = if ([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq "Arm64") { "aarch64" } else { "x86_64" }
 $Platform = "windows-$Arch"
-$Artifact = "aitoolx-$Platform.zip"
+$Artifact = "aiutilx-$Platform.zip"
 
-Write-Host "aitoolx installer"
+Write-Host "aiutilx installer"
 Write-Host "Platform : $Platform"
 Write-Host "Install  : $InstallDir"
 Write-Host ""
@@ -22,7 +22,7 @@ if (-not $Release) {
 }
 
 $Url = "https://github.com/$Repo/releases/download/$Release/$Artifact"
-$Tmp = Join-Path $env:TEMP "aitoolx-install"
+$Tmp = Join-Path $env:TEMP "aiutilx-install"
 New-Item -ItemType Directory -Force -Path $Tmp | Out-Null
 $ZipPath = Join-Path $Tmp $Artifact
 

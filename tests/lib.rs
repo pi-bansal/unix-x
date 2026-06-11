@@ -1,4 +1,4 @@
-//! Stub library for the `aitoolx-tests` package.
+//! Stub library for the `aiutilx-tests` package.
 //!
 //! The integration tests (declared as `[[test]]` targets in Cargo.toml) are the
 //! real content; they each pull in `common.rs` via `mod common;`. This file
