@@ -65,6 +65,12 @@ Every tool follows the same rules:
 
 ## Build
 
+The install scripts at the top of this README download prebuilt binaries from the
+[latest release](https://github.com/pi-bansal/aiutilx/releases/latest) — that's the
+fastest way to get started and requires no Rust toolchain.
+
+To build from source instead:
+
 ```bash
 git clone https://github.com/pi-bansal/aiutilx
 cd aiutilx
@@ -73,6 +79,19 @@ cargo build --workspace --release
 # All binaries land in target/release/
 cp target/release/{lx,px,logx,dx,arcx,envx,netx,jsonx,procx,idx,diffx,memx,statx,hashx,termx,astx,dnsx,confx} /usr/local/bin/
 ```
+
+You can force `install.sh` to build from source instead of fetching a release:
+
+```bash
+BUILD_FROM_SOURCE=1 curl -fsSL https://raw.githubusercontent.com/pi-bansal/aiutilx/main/install.sh | bash
+```
+
+### Releases
+
+Pushing a tag matching `v*` (e.g. `v0.1.0`) triggers the [release workflow](.github/workflows/release.yml),
+which builds binaries for Linux (x86_64, aarch64), macOS (x86_64, aarch64) and Windows (x86_64),
+packages them to match what `install.sh` / `install.ps1` expect, and publishes them as
+GitHub release assets.
 
 ---
 

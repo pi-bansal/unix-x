@@ -49,3 +49,10 @@ cargo clippy --workspace --release
 ```
 
 CI enforces both. PRs won't merge with clippy warnings.
+
+## Releasing
+
+Push a tag matching `v*` (e.g. `git tag v0.1.0 && git push origin v0.1.0`) to trigger
+the [release workflow](.github/workflows/release.yml). It builds binaries for Linux,
+macOS and Windows, packages them to match `install.sh` / `install.ps1`, and publishes
+them as GitHub release assets.

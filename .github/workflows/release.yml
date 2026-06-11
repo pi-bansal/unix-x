@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+  TOOLS: lx px logx dx arcx envx netx jsonx procx idx diffx memx statx hashx termx astx dnsx confx
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            platform: linux-x86_64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+            platform: linux-aarch64
+          - target: x86_64-apple-darwin
+            os: macos-13
+            platform: macos-x86_64
+          - target: aarch64-apple-darwin
+            os: macos-14
+            platform: macos-aarch64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            platform: windows-x86_64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --workspace --release --target ${{ matrix.target }}
+
+      - name: Package (tar.gz)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          stage=$(mktemp -d)
+          for tool in $TOOLS; do
+            cp "target/${{ matrix.target }}/release/$tool" "$stage/"
+          done
+          tar -czf "dist/aiutilx-${{ matrix.platform }}.tar.gz" -C "$stage" .
+
+      - name: Package (zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $stage = New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\stage"
+          foreach ($tool in $env:TOOLS -split ' ') {
+            Copy-Item "target\${{ matrix.target }}\release\$tool.exe" -Destination $stage
+          }
+          Compress-Archive -Path "$stage\*" -DestinationPath "dist\aiutilx-${{ matrix.platform }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aiutilx-${{ matrix.platform }}
+          path: dist/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
