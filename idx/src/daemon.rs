@@ -10,18 +10,30 @@
 ///   Client sends: {"kind":"rebuild"}
 ///   Server responds with a single JSON line per request.
 
-use crate::bloom::{rebuild_bloom, BloomSet};
+#[cfg(unix)]
+use crate::bloom::BloomSet;
+#[cfg(unix)]
 use crate::builder::build_index;
+#[cfg(unix)]
 use crate::columns::ColumnarIndex;
-use crate::query::{run_query, Query, QueryResult};
+use crate::query::{Query, QueryResult};
+#[cfg(unix)]
+use crate::query::run_query;
+#[cfg(unix)]
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::path::Path;
+use std::path::PathBuf;
+#[cfg(unix)]
 use std::sync::{Arc, RwLock};
+#[cfg(unix)]
 use std::time::UNIX_EPOCH;
+#[cfg(unix)]
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 #[cfg(unix)]
 use tokio::net::UnixListener;
+#[cfg(unix)]
 use tokio::sync::mpsc;
 
 // ── IPC message types ─────────────────────────────────────────────────────────
@@ -54,6 +66,7 @@ pub struct DaemonStatus {
 
 // ── Shared state ──────────────────────────────────────────────────────────────
 
+#[cfg(unix)]
 struct SharedState {
     index: ColumnarIndex,
     bloom: BloomSet,
@@ -61,6 +74,7 @@ struct SharedState {
 
 // ── Socket path ───────────────────────────────────────────────────────────────
 
+#[cfg(unix)]
 pub fn socket_path(root: &Path) -> PathBuf {
     // Hash the root path to get a unique socket name per watched directory
     use std::collections::hash_map::DefaultHasher;
@@ -69,11 +83,7 @@ pub fn socket_path(root: &Path) -> PathBuf {
     root.hash(&mut h);
     let hash = h.finish();
 
-    #[cfg(unix)]
-    return std::env::temp_dir().join(format!("idx-{:x}.sock", hash));
-
-    #[cfg(windows)]
-    return PathBuf::from(format!(r"\\.\pipe\idx-{:x}", hash));
+    std::env::temp_dir().join(format!("idx-{:x}.sock", hash))
 }
 
 // ── Daemon entry point ────────────────────────────────────────────────────────
@@ -126,7 +136,6 @@ pub async fn run_daemon(root: PathBuf, respect_gitignore: bool) {
 
     // ── File watcher ─────────────────────────────────────────────────────────
     let (tx, mut rx) = mpsc::channel::<notify::Result<Event>>(256);
-    let root_clone = root.clone();
 
     let mut watcher = match RecommendedWatcher::new(
         move |res| { let _ = tx.blocking_send(res); },

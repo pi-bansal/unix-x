@@ -11,6 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(unix)]
 pub struct RingBuffer<T> {
     buf:   Vec<T>,
     cap:   usize,
@@ -18,6 +19,7 @@ pub struct RingBuffer<T> {
     count: usize,   // number of valid entries (≤ cap)
 }
 
+#[cfg(unix)]
 impl<T: Clone + Default> RingBuffer<T> {
     pub fn new(capacity: usize) -> Self {
         RingBuffer {

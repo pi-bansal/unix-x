@@ -1,7 +1,9 @@
 /// Client — connects to the daemon socket and sends queries.
 /// Used by `idx query` and by `lx` when a daemon is running for the current dir.
 
-use crate::daemon::{socket_path, Request, Response};
+use crate::daemon::{Request, Response};
+#[cfg(unix)]
+use crate::daemon::socket_path;
 use crate::query::Query;
 use std::path::Path;
 #[cfg(unix)]
@@ -9,9 +11,13 @@ use std::time::Duration;
 
 #[derive(Debug)]
 pub enum ClientError {
+    #[cfg_attr(not(unix), allow(dead_code))]
     NoDaemon,
+    #[cfg_attr(unix, allow(dead_code))]
     Unsupported,
+    #[cfg_attr(not(unix), allow(dead_code))]
     Io(std::io::Error),
+    #[cfg_attr(not(unix), allow(dead_code))]
     Protocol(String),
 }
 

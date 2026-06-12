@@ -3,8 +3,11 @@ mod ring;
 
 use clap::{Parser, Subcommand};
 use collect::Collector;
-use ring::{RingBuffer, Sample};
+#[cfg(unix)]
+use ring::RingBuffer;
+use ring::Sample;
 use serde::Serialize;
+#[cfg(unix)]
 use std::sync::{Arc, RwLock};
 use ux_output::{emit, OutMode};
 
@@ -102,6 +105,7 @@ struct LastOutput {
     samples: Vec<Sample>,
 }
 
+#[cfg(unix)]
 fn socket_path() -> std::path::PathBuf {
     // Per-user socket in the runtime dir so concurrent users don't collide on a
     // single world-shared /tmp/statx.sock (one daemon per user is the design;
@@ -196,6 +200,18 @@ async fn main() {
     }
 }
 
+#[cfg(not(unix))]
+async fn run_daemon(_interval_secs: u64, _capacity: usize) {
+    let u = ux_output::Unavailable::new(
+        "statx start",
+        "background daemon mode (Unix socket IPC) is only implemented on Unix platforms",
+        Some("use `statx now`, `statx watch`, or `statx last`/`summary` for live sampling"),
+    );
+    eprintln!("{}", serde_json::json!({"unavailable": u}));
+    std::process::exit(1);
+}
+
+#[cfg(unix)]
 async fn run_daemon(interval_secs: u64, capacity: usize) {
     eprintln!("[statx] Starting — interval={}s, buffer={}s", interval_secs, capacity);
 
@@ -263,6 +279,12 @@ async fn run_daemon(interval_secs: u64, capacity: usize) {
     }
 }
 
+#[cfg(not(unix))]
+async fn read_from_daemon(_n: usize) -> Result<Vec<Sample>, String> {
+    Err("daemon mode not supported on this platform".into())
+}
+
+#[cfg(unix)]
 async fn read_from_daemon(n: usize) -> Result<Vec<Sample>, String> {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
     use tokio::net::UnixStream;
