@@ -56,3 +56,29 @@ Push a tag matching `v*` (e.g. `git tag v0.1.0 && git push origin v0.1.0`) to tr
 the [release workflow](.github/workflows/release.yml). It builds binaries for Linux,
 macOS and Windows, packages them to match `install.sh` / `install.ps1`, and publishes
 them as GitHub release assets.
+
+## Future consideration: single multi-call binary
+
+Today each release archive bundles 17 separate tool binaries. A `busybox`/`uutils`-style
+multi-call binary would be friendlier to install: one binary in `PATH`, with each tool
+name (`lx`, `px`, `idx`, ...) as a symlink/copy that dispatches based on `argv[0]`.
+
+This requires a non-trivial refactor and should be scoped as its own effort:
+
+1. For each tool crate, split `src/main.rs` into a `src/lib.rs` exposing
+   `pub fn run(args: Vec<String>) -> i32` (returning the process exit code), plus a
+   thin `src/main.rs` that calls it — so standalone per-tool binaries keep working.
+2. Add a new `aiutilx` binary crate that depends on all tool crates as libraries.
+   Its `main()` reads the program name from `argv[0]`; if it matches a known tool
+   name, dispatch to that tool's `run()` with the remaining args. If invoked as
+   `aiutilx`, treat `argv[1]` as the tool name.
+3. Tools using `#[tokio::main]` need to construct their own `tokio::Runtime` inside
+   `run()` instead of relying on the attribute macro (dispatch is sequential, so
+   only one runtime is ever active).
+4. Update `release.yml` to build the `aiutilx` binary and, in the packaging step,
+   create symlinks (Unix) or copies (Windows, where symlinks need elevated
+   privileges) named after each tool pointing at `aiutilx`.
+5. Roll out incrementally — pilot with 2-3 tools (e.g. `lx`, `px`, `idx`) to validate
+   the dispatcher and packaging before converting the rest.
+
+Not started — flagging here so it's not lost.
