@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "ux-output",
+    "aiux",
     "lx",
     "px",
     "logx",

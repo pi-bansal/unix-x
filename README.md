@@ -47,6 +47,9 @@ Inspired by how `ripgrep` reimagined `grep` — not a wrapper, a ground-up rethi
 | [`dnsx`](#dnsx) | dig, nslookup, host | Structured DNS lookups |
 | [`confx`](#confx) | yq, manual config parsing | YAML/TOML/INI/.properties to JSON |
 
+`aiux` is a dispatcher: `aiux <tool> [args...]` runs `<tool> [args...]` directly —
+useful if you only want to remember one binary name.
+
 ---
 
 ## Design contract
