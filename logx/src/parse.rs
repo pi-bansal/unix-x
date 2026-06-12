@@ -3,6 +3,20 @@ use regex::Regex;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::LazyLock;
+
+static LOGFMT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(\w+)=("(?:[^"\\]|\\.)*"|\S+)"#).unwrap());
+static NGINX_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) (\S+) \S+" (\d+) (\d+)"#).unwrap()
+});
+static SYSLOG_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"^(\w+\s+\d+\s+\d+:\d+:\d+)\s+(\S+)\s+(\S+?)(?:\[(\d+)\])?:\s*(.*)"#).unwrap()
+});
+static RAILS_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"^([A-Z]), \[([^\]]+)\]\s+(\w+) -- \S*: (.*)"#).unwrap());
+static GO_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})\s+(.*)"#).unwrap());
 
 #[derive(Serialize, Clone)]
 pub struct LogEntry {
@@ -81,8 +95,7 @@ fn parse_logfmt(raw: &str, line: u64) -> LogEntry {
     let mut timestamp = None;
 
     // Simple logfmt tokenizer
-    let re = Regex::new(r#"(\w+)=("(?:[^"\\]|\\.)*"|\S+)"#).unwrap();
-    for cap in re.captures_iter(raw) {
+    for cap in LOGFMT_RE.captures_iter(raw) {
         let key = cap[1].to_string();
         let val = cap[2].trim_matches('"').to_string();
 
@@ -106,11 +119,7 @@ fn parse_logfmt(raw: &str, line: u64) -> LogEntry {
 
 fn parse_nginx(raw: &str, line: u64) -> LogEntry {
     // Combined log format: IP - user [date] "method path proto" status bytes "ref" "ua"
-    let re = Regex::new(
-        r#"^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) (\S+) \S+" (\d+) (\d+)"#,
-    ).unwrap();
-
-    if let Some(cap) = re.captures(raw) {
+    if let Some(cap) = NGINX_RE.captures(raw) {
         let status: u16 = cap[5].parse().unwrap_or(0);
         let level = Some(if status >= 500 { "error" } else if status >= 400 { "warn" } else { "info" }.to_string());
         let mut fields = HashMap::new();
@@ -134,11 +143,7 @@ fn parse_nginx(raw: &str, line: u64) -> LogEntry {
 }
 
 fn parse_syslog(raw: &str, line: u64) -> LogEntry {
-    let re = Regex::new(
-        r#"^(\w+\s+\d+\s+\d+:\d+:\d+)\s+(\S+)\s+(\S+?)(?:\[(\d+)\])?:\s*(.*)"#,
-    ).unwrap();
-
-    if let Some(cap) = re.captures(raw) {
+    if let Some(cap) = SYSLOG_RE.captures(raw) {
         let mut fields = HashMap::new();
         fields.insert("host".to_string(), Value::String(cap[2].to_string()));
         fields.insert("unit".to_string(), Value::String(cap[3].to_string()));
@@ -160,9 +165,7 @@ fn parse_syslog(raw: &str, line: u64) -> LogEntry {
 }
 
 fn parse_rails(raw: &str, line: u64) -> LogEntry {
-    let re = Regex::new(r#"^([A-Z]), \[([^\]]+)\]\s+(\w+) -- \S*: (.*)"#).unwrap();
-
-    if let Some(cap) = re.captures(raw) {
+    if let Some(cap) = RAILS_RE.captures(raw) {
         return LogEntry {
             line,
             timestamp: Some(cap[2].to_string()),
@@ -177,9 +180,7 @@ fn parse_rails(raw: &str, line: u64) -> LogEntry {
 }
 
 fn parse_go(raw: &str, line: u64) -> LogEntry {
-    let re = Regex::new(r#"^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})\s+(.*)"#).unwrap();
-
-    if let Some(cap) = re.captures(raw) {
+    if let Some(cap) = GO_RE.captures(raw) {
         return LogEntry {
             line,
             timestamp: Some(cap[1].to_string()),

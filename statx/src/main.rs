@@ -132,9 +132,11 @@ async fn main() {
         Cmd::Now { out } => {
             let mode = OutMode::from_str(&out);
             let mut collector = Collector::new();
-            // Two samples: first warms up the delta counters
+            // Two samples: first warms up the delta counters. /proc counters
+            // tick at 100Hz (10ms), so 50ms is plenty to get a non-zero delta
+            // while keeping `now` fast.
             collector.sample();
-            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
             let sample = collector.sample();
             emit(&sample, &mode);
         }

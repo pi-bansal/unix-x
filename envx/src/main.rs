@@ -4,6 +4,14 @@ use regex::Regex;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+
+static AWS_KEY_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^AKIA[0-9A-Z]{16}$").unwrap());
+static JWT_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$").unwrap()
+});
+static HEX_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9a-fA-F]+$").unwrap());
+static BASE64_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[A-Za-z0-9+/=]+$").unwrap());
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -187,15 +195,12 @@ fn detect_secret(key: &str, value: &str) -> Option<SecretKind> {
     let key_upper = key.to_uppercase();
 
     // AWS access key
-    if Regex::new(r"^AKIA[0-9A-Z]{16}$").unwrap().is_match(value) {
+    if AWS_KEY_RE.is_match(value) {
         return Some(SecretKind::AwsKey);
     }
 
     // JWT
-    if Regex::new(r"^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$")
-        .unwrap()
-        .is_match(value)
-    {
+    if JWT_RE.is_match(value) {
         return Some(SecretKind::JwtToken);
     }
 
@@ -205,13 +210,13 @@ fn detect_secret(key: &str, value: &str) -> Option<SecretKind> {
     }
 
     // Long hex string (likely key/hash)
-    if value.len() >= 32 && Regex::new(r"^[0-9a-fA-F]+$").unwrap().is_match(value) {
+    if value.len() >= 32 && HEX_RE.is_match(value) {
         return Some(SecretKind::HexString);
     }
 
     // Long base64 blob
     if value.len() >= 32
-        && Regex::new(r"^[A-Za-z0-9+/=]+$").unwrap().is_match(value)
+        && BASE64_RE.is_match(value)
         && value.len() % 4 == 0
     {
         return Some(SecretKind::Base64Blob);

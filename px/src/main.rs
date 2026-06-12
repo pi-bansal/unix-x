@@ -86,8 +86,9 @@ fn main() {
     ux_output::reset_sigpipe();
     let cli = Cli::parse();
 
-    let mut sys = System::new_all();
-    sys.refresh_all();
+    // `new_all()` already performs a full refresh; an extra `refresh_all()`
+    // would redo the entire /proc scan for no benefit.
+    let sys = System::new_all();
 
     // Build pid->name map for network correlation
     let pid_names: HashMap<u32, String> = sys
