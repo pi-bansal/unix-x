@@ -43,3 +43,57 @@ fn idx_once_files_and_filter_flags_coexist() {
         .iter()
         .any(|e| e["path"].as_str().unwrap().ends_with("a.rs")));
 }
+
+#[test]
+fn idx_once_entries_have_documented_fields() {
+    let dir = tempdir().unwrap();
+    fs::write(dir.path().join("a.rs"), "fn main(){}").unwrap();
+
+    let v = json(&run("idx", &["once", dir.path().to_str().unwrap(), "--ext", "rs"]));
+    let e = &v["entries"][0];
+    assert!(e["path"].is_string());
+    assert!(e["size"].is_u64());
+    assert!(e["mtime"].is_u64(), "mtime should be an epoch integer");
+    assert_eq!(e["extension"], "rs");
+    assert_eq!(e["is_dir"], false);
+}
+
+#[test]
+fn idx_once_sort_size_orders_largest_first() {
+    let dir = tempdir().unwrap();
+    fs::write(dir.path().join("big.rs"), "x".repeat(500)).unwrap();
+    fs::write(dir.path().join("small.rs"), "x").unwrap();
+
+    let v = json(&run(
+        "idx",
+        &["once", dir.path().to_str().unwrap(), "--ext", "rs", "--sort", "size", "--files"],
+    ));
+    let entries = v["entries"].as_array().unwrap();
+    assert_eq!(entries.len(), 2);
+    assert!(entries[0]["path"].as_str().unwrap().ends_with("big.rs"));
+    assert!(entries[0]["size"].as_u64() >= entries[1]["size"].as_u64());
+}
+
+#[test]
+fn idx_once_size_gt_filters() {
+    let dir = tempdir().unwrap();
+    fs::write(dir.path().join("big.rs"), "x".repeat(500)).unwrap();
+    fs::write(dir.path().join("small.rs"), "x").unwrap();
+
+    let v = json(&run(
+        "idx",
+        &["once", dir.path().to_str().unwrap(), "--ext", "rs", "--size-gt", "100", "--files"],
+    ));
+    let entries = v["entries"].as_array().unwrap();
+    assert!(entries.iter().all(|e| e["size"].as_u64().unwrap() > 100));
+    assert!(entries.iter().any(|e| e["path"].as_str().unwrap().ends_with("big.rs")));
+}
+
+#[test]
+fn idx_once_nonexistent_extension_is_empty() {
+    let dir = tempdir().unwrap();
+    fs::write(dir.path().join("a.rs"), "x").unwrap();
+
+    let v = json(&run("idx", &["once", dir.path().to_str().unwrap(), "--ext", "zzz"]));
+    assert_eq!(v["count"].as_u64(), Some(0));
+}
