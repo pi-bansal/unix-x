@@ -3,7 +3,7 @@
 
 $Repo    = "pi-bansal/aiutilx"
 $InstallDir = if ($env:AIUTILX_INSTALL_DIR) { $env:AIUTILX_INSTALL_DIR } else { "$env:USERPROFILE\.aiutilx\bin" }
-$Tools   = @("aiux","lx","px","logx","dx","arcx","envx","netx","jsonx","procx","idx","diffx","memx","statx","hashx","termx","astx","dnsx","confx")
+$Tools   = @("aiux","mcpx","lx","px","logx","dx","arcx","envx","netx","jsonx","procx","idx","diffx","memx","statx","hashx","termx","astx","dnsx","confx")
 $Arch    = if ([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq "Arm64") { "aarch64" } else { "x86_64" }
 $Platform = "windows-$Arch"
 $Artifact = "aiutilx-$Platform.zip"

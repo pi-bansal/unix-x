@@ -1,0 +1,18 @@
+[package]
+name = "mcpx"
+version = "0.1.0"
+edition = "2021"
+description = "Model Context Protocol server exposing every aiutilx tool to AI agents"
+
+[[bin]]
+name = "mcpx"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

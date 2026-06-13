@@ -2,6 +2,7 @@
 members = [
     "ux-output",
     "aiux",
+    "mcpx",
     "lx",
     "px",
     "logx",
