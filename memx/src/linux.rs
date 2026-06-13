@@ -64,6 +64,7 @@ pub struct ProcessMemory {
     pub lib_bytes:      u64,   // total PSS from shared libraries
     pub anon_bytes:     u64,   // anonymous mappings (likely custom allocators / mmap)
     pub region_count:   usize,
+    pub regions_truncated: bool,
     pub regions:        Vec<MemRegion>,
 }
 
@@ -104,6 +105,7 @@ pub fn read_process_memory(pid: u32, include_regions: bool) -> Result<ProcessMem
         lib_bytes,
         anon_bytes,
         region_count,
+        regions_truncated: false,
         regions: if include_regions { regions } else { vec![] },
     })
 }

@@ -49,6 +49,7 @@ pub struct ProcessMemory {
     pub stack_bytes:   u64,
     pub text_bytes:    u64,
     pub region_count:  usize,
+    pub regions_truncated: bool,
     pub regions:       Vec<MemRegion>,
 }
 
@@ -91,6 +92,7 @@ pub fn read_process_memory(pid: u32, include_regions: bool) -> Result<ProcessMem
         stack_bytes,
         text_bytes,
         region_count,
+        regions_truncated: false,
         regions: if include_regions { regions } else { vec![] },
     })
 }

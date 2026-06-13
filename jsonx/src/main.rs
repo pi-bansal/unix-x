@@ -8,6 +8,60 @@ use serde_json::Value;
 use std::io::{self, BufRead, Read};
 use std::path::PathBuf;
 
+/// Cap input size — without this, a huge file is fully read into memory
+/// before we even attempt to parse it.
+const MAX_INPUT_BYTES: u64 = 256 * 1024 * 1024;
+
+/// `serde_json::from_str::<Value>` recurses once per nesting level with no
+/// built-in limit; deeply nested input (e.g. 10k+ levels of `[[[...]]]`) can
+/// overflow the stack. Reject input nested deeper than this before parsing.
+const MAX_JSON_DEPTH: usize = 512;
+
+/// Scan for the maximum `{`/`[` nesting depth, ignoring brackets inside
+/// JSON strings.
+fn max_nesting_depth(s: &str) -> usize {
+    let mut depth = 0usize;
+    let mut max_depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+
+    for b in s.bytes() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if b == b'\\' {
+                escaped = true;
+            } else if b == b'"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match b {
+            b'"' => in_string = true,
+            b'{' | b'[' => {
+                depth += 1;
+                max_depth = max_depth.max(depth);
+            }
+            b'}' | b']' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+
+    max_depth
+}
+
+fn read_capped(mut reader: impl Read) -> io::Result<String> {
+    let mut buf = Vec::new();
+    reader.by_ref().take(MAX_INPUT_BYTES + 1).read_to_end(&mut buf)?;
+    if buf.len() as u64 > MAX_INPUT_BYTES {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("input exceeds {} byte limit", MAX_INPUT_BYTES),
+        ));
+    }
+    String::from_utf8(buf).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+}
+
 #[derive(Parser)]
 #[command(
     name = "jsonx",
@@ -57,23 +111,32 @@ fn main() {
     let cli = Cli::parse();
 
     let input = match &cli.file {
-        Some(path) => std::fs::read_to_string(path).unwrap_or_else(|e| {
-            eprintln!("{{\"error\": \"{}\"}}", e);
+        Some(path) => {
+            let f = std::fs::File::open(path).unwrap_or_else(|e| {
+                eprintln!("{{\"error\": \"{}\"}}", e);
+                std::process::exit(1);
+            });
+            read_capped(f).unwrap_or_else(|e| {
+                eprintln!("{{\"error\": \"{}\"}}", e);
+                std::process::exit(1);
+            })
+        }
+        None => read_capped(io::stdin()).unwrap_or_else(|e| {
+            eprintln!("{}", serde_json::json!({ "error": e.to_string() }));
             std::process::exit(1);
         }),
-        None => {
-            // read_to_string errors on non-UTF-8 stdin; surface it as a
-            // structured error instead of panicking.
-            let mut s = String::new();
-            if let Err(e) = io::stdin().read_to_string(&mut s) {
-                eprintln!("{}", serde_json::json!({ "error": e.to_string() }));
-                std::process::exit(1);
-            }
-            s
-        }
     };
 
     let steps = parse_path(&cli.path);
+
+    // Reject pathologically nested input before handing it to serde_json's
+    // recursive-descent parser, which has no built-in depth limit.
+    if max_nesting_depth(&input) > MAX_JSON_DEPTH {
+        eprintln!("{}", serde_json::json!({
+            "error": format!("input nesting exceeds max depth of {}", MAX_JSON_DEPTH)
+        }));
+        std::process::exit(1);
+    }
 
     // Parse input as single JSON or NDJSON
     let roots: Vec<Value> = if cli.ndjson_in {

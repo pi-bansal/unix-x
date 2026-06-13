@@ -29,6 +29,9 @@ pub struct Entry {
     pub target: Option<String>, // symlink only: resolved target
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extension: Option<String>, // file only
+    /// dir only: `size`/`children` stopped early at a cap and are a lower bound
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub size_truncated: bool,
 }
 
 #[derive(Serialize, Clone, PartialEq)]
@@ -50,6 +53,7 @@ impl Entry {
         git_status: Option<GitStatus>,
         recursive_size: Option<u64>,
         child_count: Option<u64>,
+        size_truncated: bool,
     ) -> Self {
         let name = path
             .file_name()
@@ -110,6 +114,7 @@ impl Entry {
             children: child_count,
             target,
             extension,
+            size_truncated,
         }
     }
 }

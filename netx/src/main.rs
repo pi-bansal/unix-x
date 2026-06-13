@@ -2,6 +2,7 @@ use clap::Parser;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::io::Read;
 use std::time::Instant;
 
 #[derive(Serialize)]
@@ -25,10 +26,15 @@ pub struct Response {
     pub headers: HashMap<String, String>,
     pub content_type: Option<String>,
     pub body_bytes: u64,
+    pub body_truncated: bool,
     pub body: ResponseBody,
     pub timing: Timing,
     pub redirects: Vec<RedirectEntry>,
 }
+
+/// Cap response body reads so a server can't stream unbounded data into
+/// memory (or a multi-GB response into the agent's context).
+const MAX_BODY_BYTES: u64 = 10 * 1024 * 1024;
 
 #[derive(Serialize)]
 #[serde(untagged)]
@@ -198,8 +204,8 @@ fn process_response(
         }
     }
 
-    let body = if cli.head_only {
-        ResponseBody::Text(String::new())
+    let (body, body_truncated) = if cli.head_only {
+        (ResponseBody::Text(String::new()), false)
     } else {
         parse_body(resp, &content_type)
     };
@@ -219,6 +225,7 @@ fn process_response(
         headers,
         content_type: Some(content_type),
         body_bytes,
+        body_truncated,
         body,
         timing: Timing { total_ms: elapsed_ms },
         redirects,
@@ -227,29 +234,40 @@ fn process_response(
     emit(&output, &cli.out);
 }
 
-fn parse_body(resp: ureq::Response, content_type: &str) -> ResponseBody {
+fn parse_body(resp: ureq::Response, content_type: &str) -> (ResponseBody, bool) {
     let ct = content_type.to_lowercase();
     let mut buf = Vec::new();
-    let mut reader = resp.into_reader();
+    let mut reader = resp.into_reader().take(MAX_BODY_BYTES + 1);
     reader.read_to_end(&mut buf).ok();
+    let truncated = buf.len() as u64 > MAX_BODY_BYTES;
+    if truncated {
+        buf.truncate(MAX_BODY_BYTES as usize);
+    }
     let body_str = String::from_utf8_lossy(&buf);
 
-    if ct.contains("application/json") || ct.contains("+json") {
-        if let Ok(v) = serde_json::from_str::<Value>(&body_str) {
-            return ResponseBody::Json(v);
+    // A truncated body is unlikely to be valid JSON/UTF-8 text — fall back
+    // to the binary representation so the agent sees what was captured.
+    if !truncated {
+        if ct.contains("application/json") || ct.contains("+json") {
+            if let Ok(v) = serde_json::from_str::<Value>(&body_str) {
+                return (ResponseBody::Json(v), truncated);
+            }
         }
-    }
 
-    if ct.contains("text/") || ct.contains("application/xml") || ct.contains("application/javascript") {
-        return ResponseBody::Text(body_str.to_string());
+        if ct.contains("text/") || ct.contains("application/xml") || ct.contains("application/javascript") {
+            return (ResponseBody::Text(body_str.to_string()), truncated);
+        }
     }
 
     // Binary fallback
     use base64::{Engine as _, engine::general_purpose};
-    ResponseBody::Binary {
-        encoding: "base64".to_string(),
-        data: general_purpose::STANDARD.encode(&buf),
-    }
+    (
+        ResponseBody::Binary {
+            encoding: "base64".to_string(),
+            data: general_purpose::STANDARD.encode(&buf),
+        },
+        truncated,
+    )
 }
 
 fn emit(output: &Response, mode: &str) {

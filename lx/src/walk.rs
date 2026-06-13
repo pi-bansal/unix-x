@@ -68,31 +68,43 @@ pub fn walk(root: &Path, opts: &WalkOptions, git: Option<&GitIndex>) -> Vec<Entr
         let git_status = git.and_then(|g| g.status_for(path));
 
         // For dirs: count direct children and compute recursive size
-        let (recursive_size, child_count) = if meta.is_dir() {
+        let (recursive_size, child_count, size_truncated) = if meta.is_dir() {
             dir_stats(path)
         } else {
-            (None, None)
+            (None, None, false)
         };
 
-        let entry = Entry::from_metadata(path, &meta, git_status, recursive_size, child_count);
+        let entry = Entry::from_metadata(path, &meta, git_status, recursive_size, child_count, size_truncated);
         entries.push(entry);
     }
 
     entries
 }
 
+/// Cap how many filesystem entries a single directory's recursive size/child
+/// count will walk. Without this, listing a directory containing e.g.
+/// `node_modules` (100k+ files) does a full unbounded walk just to show its
+/// size — and that cost is paid again for every ancestor directory shown.
+const MAX_STAT_ENTRIES: usize = 50_000;
+
 /// Compute recursive byte size and direct child count for a directory.
-/// Fast: uses walkdir internally with no depth limit.
-fn dir_stats(dir: &Path) -> (Option<u64>, Option<u64>) {
+/// Stops early (marking the result as a lower-bound/truncated) past
+/// `MAX_STAT_ENTRIES` entries.
+fn dir_stats(dir: &Path) -> (Option<u64>, Option<u64>, bool) {
     let mut total_size: u64 = 0;
     let mut child_count: u64 = 0;
-    let mut direct_children_seen = std::collections::HashSet::new();
+    let mut visited: usize = 0;
+    let mut truncated = false;
 
     for result in walkdir::WalkDir::new(dir).min_depth(1).into_iter() {
+        if visited >= MAX_STAT_ENTRIES {
+            truncated = true;
+            break;
+        }
         if let Ok(e) = result {
+            visited += 1;
             // Count direct children
             if e.depth() == 1 {
-                direct_children_seen.insert(e.path().to_path_buf());
                 child_count += 1;
             }
             if let Ok(m) = e.metadata() {
@@ -103,5 +115,5 @@ fn dir_stats(dir: &Path) -> (Option<u64>, Option<u64>) {
         }
     }
 
-    (Some(total_size), Some(child_count))
+    (Some(total_size), Some(child_count), truncated)
 }

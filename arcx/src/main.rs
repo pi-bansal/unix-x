@@ -26,8 +26,14 @@ pub struct ArchiveInfo {
     pub total_size_uncompressed: u64,
     pub total_size_compressed: Option<u64>,
     pub compression_ratio: Option<f32>,
+    pub truncated: bool,
     pub entries: Vec<ArchiveEntry>,
 }
+
+/// Caps for decompression-bomb protection. A small archive can claim/expand
+/// to far more entries or bytes than any agent needs to see.
+const MAX_ENTRIES: usize = 100_000;
+const MAX_GZ_DECOMPRESS_BYTES: u64 = 256 * 1024 * 1024;
 
 #[derive(Parser)]
 #[command(name = "arcx", about = "Unified archive inspection for AI agents.", version)]
@@ -155,8 +161,9 @@ fn inspect_zip(path: &Path) -> Result<ArchiveInfo, String> {
     let mut entries = Vec::new();
     let mut total_uncompressed = 0u64;
     let mut total_compressed = 0u64;
+    let truncated = archive.len() > MAX_ENTRIES;
 
-    for i in 0..archive.len() {
+    for i in 0..archive.len().min(MAX_ENTRIES) {
         let entry = archive.by_index(i).map_err(|e| e.to_string())?;
 
         let entry_type = if entry.is_dir() {
@@ -209,6 +216,7 @@ fn inspect_zip(path: &Path) -> Result<ArchiveInfo, String> {
         total_size_uncompressed: total_uncompressed,
         total_size_compressed: Some(total_compressed),
         compression_ratio: ratio,
+        truncated,
         entries,
     })
 }
@@ -229,8 +237,13 @@ fn inspect_tar(path: &Path, format: &str) -> Result<ArchiveInfo, String> {
     let mut archive = tar::Archive::new(reader);
     let mut entries = Vec::new();
     let mut total_uncompressed = 0u64;
+    let mut truncated = false;
 
     for entry_result in archive.entries().map_err(|e| e.to_string())? {
+        if entries.len() >= MAX_ENTRIES {
+            truncated = true;
+            break;
+        }
         let entry = entry_result.map_err(|e| e.to_string())?;
         let header = entry.header();
 
@@ -275,6 +288,7 @@ fn inspect_tar(path: &Path, format: &str) -> Result<ArchiveInfo, String> {
         total_size_uncompressed: total_uncompressed,
         total_size_compressed: file_size,
         compression_ratio: file_size.map(|fs| fs as f32 / total_uncompressed.max(1) as f32),
+        truncated,
         entries,
     })
 }
@@ -283,9 +297,17 @@ fn inspect_gz(path: &Path) -> Result<ArchiveInfo, String> {
     // Single gzipped file — just report metadata
     let file = File::open(path).map_err(|e| e.to_string())?;
     let compressed_size = file.metadata().map(|m| m.len()).unwrap_or(0);
-    let mut decoder = flate2::read::GzDecoder::new(file);
+    let decoder = flate2::read::GzDecoder::new(file);
+    // Cap decompression so a small file claiming a huge inflated size (a
+    // "gzip bomb") can't exhaust memory — read one byte past the cap to
+    // detect truncation.
+    let mut limited = decoder.take(MAX_GZ_DECOMPRESS_BYTES + 1);
     let mut buf = Vec::new();
-    decoder.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+    limited.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+    let truncated = buf.len() as u64 > MAX_GZ_DECOMPRESS_BYTES;
+    if truncated {
+        buf.truncate(MAX_GZ_DECOMPRESS_BYTES as usize);
+    }
     let uncompressed_size = buf.len() as u64;
 
     let inner_name = path
@@ -300,6 +322,7 @@ fn inspect_gz(path: &Path) -> Result<ArchiveInfo, String> {
         total_size_uncompressed: uncompressed_size,
         total_size_compressed: Some(compressed_size),
         compression_ratio: Some(compressed_size as f32 / uncompressed_size.max(1) as f32),
+        truncated,
         entries: vec![ArchiveEntry {
             path: inner_name,
             entry_type: "file".to_string(),

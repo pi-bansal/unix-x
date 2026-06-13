@@ -7,6 +7,11 @@ use clap::Parser;
 use serde::Serialize;
 use ux_output::{emit, is_linux, is_macos, unavail, MaybeAvailable, OutMode};
 
+/// Cap how many regions are emitted — a process with tens of thousands of
+/// mappings (browsers, JVMs) would otherwise dump a multi-MB region list.
+/// `region_count` above still reflects the true total.
+const MAX_REGIONS: usize = 2000;
+
 #[derive(Parser)]
 #[command(
     name = "memx",
@@ -77,6 +82,11 @@ fn run_linux(cli: &Cli, mode: &OutMode) {
                 _     => mem.regions.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes)),
             }
 
+            if mem.regions.len() > MAX_REGIONS {
+                mem.regions.truncate(MAX_REGIONS);
+                mem.regions_truncated = true;
+            }
+
             if cli.out == "table" {
                 print_linux_table(&mem);
             } else {
@@ -102,6 +112,11 @@ fn run_macos(cli: &Cli, mode: &OutMode) {
             }
 
             mem.regions.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+
+            if mem.regions.len() > MAX_REGIONS {
+                mem.regions.truncate(MAX_REGIONS);
+                mem.regions_truncated = true;
+            }
 
             if cli.out == "table" {
                 print_macos_table(&mem);
