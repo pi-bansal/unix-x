@@ -135,14 +135,40 @@ fn netx_head_only_omits_body() {
 
 /// Capture the raw request bytes the client sends, then return 200. The captured
 /// request is delivered over a channel so the test can assert on method/body.
+///
+/// Reads in a loop until the full request (headers + any `Content-Length` body)
+/// has arrived — a single `read()` can return just the headers if the body lands
+/// in a separate TCP segment, which is timing-dependent and flaky under debug
+/// builds / loaded CI runners.
 fn serve_capturing(tx: mpsc::Sender<String>) -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind ephemeral port");
     let port = listener.local_addr().unwrap().port();
     thread::spawn(move || {
         if let Ok((mut stream, _)) = listener.accept() {
+            let mut data = Vec::new();
             let mut buf = [0u8; 4096];
-            let n = stream.read(&mut buf).unwrap_or(0);
-            let _ = tx.send(String::from_utf8_lossy(&buf[..n]).into_owned());
+            loop {
+                let n = stream.read(&mut buf).unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                data.extend_from_slice(&buf[..n]);
+
+                let text = String::from_utf8_lossy(&data);
+                if let Some(header_end) = text.find("\r\n\r\n") {
+                    let headers = &text[..header_end];
+                    let content_length = headers
+                        .lines()
+                        .find_map(|l| l.to_lowercase().strip_prefix("content-length:").map(|v| v.trim().to_string()))
+                        .and_then(|v| v.parse::<usize>().ok())
+                        .unwrap_or(0);
+                    let body_len = data.len() - (header_end + 4);
+                    if body_len >= content_length {
+                        break;
+                    }
+                }
+            }
+            let _ = tx.send(String::from_utf8_lossy(&data).into_owned());
             let resp = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok";
             let _ = stream.write_all(resp.as_bytes());
             let _ = stream.flush();
