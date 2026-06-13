@@ -5,7 +5,7 @@ set -euo pipefail
 
 REPO="pi-bansal/aiutilx"
 INSTALL_DIR="${AIUTILX_INSTALL_DIR:-/usr/local/bin}"
-TOOLS=(aiux lx px logx dx arcx envx netx jsonx procx idx diffx memx statx hashx termx astx dnsx confx)
+TOOLS=(aiux mcpx lx px logx dx arcx envx netx jsonx procx idx diffx memx statx hashx termx astx dnsx confx)
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
