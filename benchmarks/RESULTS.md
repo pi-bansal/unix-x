@@ -128,6 +128,28 @@ The benchmark that matters most for agents — fewer round trips and fewer
 parse failures per task — favors aiutilx by roughly **2-3x fewer tool
 invocations** for the multi-step tasks above, with zero raw-speed penalty.
 
+## Resource-exhaustion guards
+
+Six tools that consume external or filesystem-controlled input now cap how
+much they'll read/return, so a small/malicious input can't blow up memory or
+flood an agent's context window. Each cap surfaces a `truncated` (or
+`*_truncated`) field so the agent knows the result is partial rather than
+silently getting incomplete data.
+
+| Tool   | Risk                                              | Cap                                            |
+|--------|---------------------------------------------------|------------------------------------------------|
+| `arcx` | zip/tar bomb (claims huge entry count or inflated size) | 100k entries; gzip decompression capped at 256MB |
+| `netx` | server streams unbounded response body            | response body capped at 10MB                   |
+| `memx` | process with tens of thousands of mappings (browsers, JVMs) | region list capped at 2000 (after sort, so the most relevant survive) |
+| `logx` | huge log file loaded fully into memory             | streams line-by-line instead of buffering the whole file (except `--tail`/`--stats`, which need a full pass) |
+| `jsonx`| huge or deeply-nested input (stack overflow risk)  | input capped at 256MB; nesting depth capped at 512 |
+| `lx`   | recursive size/child-count walk into `node_modules`-sized dirs | directory walk for size/child-count capped at 50k entries per dir |
+
+Re-running `raw_perf.sh` after adding these guards shows no measurable
+regression — the affected tools (`lx`, `jsonx`, `logx`, `memx`, `arcx`,
+`netx`) are all within run-to-run noise (±1ms) of their numbers above, since
+the caps only engage on pathological inputs.
+
 ## aiux dispatcher
 
 `aiux <tool> [args...]` doesn't change per-call performance (it's a single
